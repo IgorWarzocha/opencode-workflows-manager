@@ -1,7 +1,5 @@
-/**
- * registries.ts
- * Loads registry sources and fetches registry definitions.
- */
+//Loads registry sources and fetches registry definitions from remote or local targets.
+//Resolves configuration merging and base URL application for external assets.
 
 import fs from "fs-extra";
 import path from "path";
@@ -18,6 +16,8 @@ export interface RegistrySource {
 }
 
 const REGISTRY_LIST_FILE = "registries.json";
+const REGISTRY_LIST_REPO = "IgorWarzocha/opencode-workflows-manager";
+const REGISTRY_LIST_BRANCHES = ["master", "main", "universal"] as const;
 const REGISTRY_TOML = "registry.toml";
 const REGISTRY_JSON = "registry.json";
 
@@ -80,12 +80,38 @@ function withBaseUrls(registry: Registry, baseUrl: string): Registry {
 }
 
 export async function loadRegistrySources(): Promise<RegistrySource[]> {
+  for (const branch of REGISTRY_LIST_BRANCHES) {
+    const url = `https://raw.githubusercontent.com/${REGISTRY_LIST_REPO}/${branch}/${REGISTRY_LIST_FILE}`;
+    try {
+      return await fetchJson<RegistrySource[]>(url);
+    } catch {
+      // try next branch
+    }
+  }
+
   const listPath = path.join(process.cwd(), REGISTRY_LIST_FILE);
   const exists = await fs.pathExists(listPath);
   if (!exists) return [];
   const raw = await fs.readFile(listPath, "utf-8");
-  const parsed = JSON.parse(raw) as RegistrySource[];
-  return parsed;
+  return JSON.parse(raw) as RegistrySource[];
+}
+
+export async function loadLocalRegistry(): Promise<{ registry: Registry; config: AppConfig } | null> {
+  const registryPath = path.join(process.cwd(), REGISTRY_JSON);
+  const exists = await fs.pathExists(registryPath);
+  if (!exists) return null;
+
+  const registry = JSON.parse(await fs.readFile(registryPath, "utf-8")) as Registry;
+  let config = DEFAULT_CONFIG;
+
+  const tomlPath = path.join(process.cwd(), REGISTRY_TOML);
+  if (await fs.pathExists(tomlPath)) {
+    const tomlText = await fs.readFile(tomlPath, "utf-8");
+    const parsed = parseToml(tomlText) as unknown as PartialAppConfig;
+    config = mergeConfig(config, parsed);
+  }
+
+  return { registry, config };
 }
 
 export async function loadRegistryFromSource(

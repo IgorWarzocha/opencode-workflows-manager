@@ -1,7 +1,7 @@
 /**
  * ConfirmView.tsx
- * Displays pending changes summary and sync warnings.
- * Shows items to be installed, updated, and removed before sync.
+ * Displays pending changes summary and sync warnings with a fixed-width table.
+ * Groups items by pack and type for quick inspection before sync.
  */
 
 import { TextAttributes } from "@opentui/core";

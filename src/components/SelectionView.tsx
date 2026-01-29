@@ -111,7 +111,11 @@ export function SelectionView(props: SelectionViewProps) {
             );
 
             const itemCount =
-              item.type === "pack" ? ` (${item.pack!.items.length})` : "";
+              item.type === "pack"
+                ? ` (${props.installMode() === "global"
+                  ? item.pack!.items.filter((i) => i.type !== "doc").length
+                  : item.pack!.items.length})`
+                : "";
 
             const typeLabel =
               item.type === "item" && item.item && item.parent?.startsWith("pack:")

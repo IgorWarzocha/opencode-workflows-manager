@@ -1,7 +1,7 @@
 /**
  * registry.ts
- * Handles registry loading and target path resolution.
- * Prefixes specialized items with .opencode/ when needed.
+ * Resolves install paths and calculates installed registry items.
+ * Applies doc handling rules and install mode constraints.
  */
 
 import fs from "fs-extra";
@@ -37,6 +37,7 @@ export async function findInstalledItems(
 ): Promise<Set<RegistryItem>> {
   const installed = new Set<RegistryItem>();
   for (const item of items) {
+    if (mode === "global" && item.type === "doc") continue;
     const exists = await fs.pathExists(resolveTargetPath(item, mode, config));
     if (exists) {
       installed.add(item);

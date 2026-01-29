@@ -1,8 +1,5 @@
-/**
- * types.ts
- * Defines registry data structures and UI item types for the workflow selector.
- * All types use discriminated unions for type-safe pattern matching.
- */
+//Defines core data structures and UI types for registry management.
+//Provides discriminated unions for items, packs, and application status.
 
 export type ItemType = "agent" | "skill" | "command" | "doc";
 
@@ -43,6 +40,7 @@ export interface UIItem {
 
 export type AppStatus =
   | "selecting-registry"
+  | "creating-registry"
   | "selecting"
   | "confirming"
   | "syncing"

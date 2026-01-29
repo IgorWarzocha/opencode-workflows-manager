@@ -1,6 +1,7 @@
 /**
  * registry-config.ts
  * Shared configuration structures and defaults for registries.
+ * Normalizes install paths and mirrors Opencode config directory behavior.
  */
 
 import path from "path";

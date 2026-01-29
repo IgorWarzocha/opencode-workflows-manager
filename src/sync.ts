@@ -1,7 +1,7 @@
 /**
  * sync.ts
- * Executes file sync operations: installing and removing workflow items.
- * Fetches content from GitHub and writes to local filesystem.
+ * Executes file sync operations with a sequential rate-limited downloader.
+ * Writes installed or refreshed items to the configured targets.
  */
 
 import fs from "fs-extra";
