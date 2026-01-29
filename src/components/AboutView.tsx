@@ -38,17 +38,7 @@ export function AboutView() {
 
       <box marginBottom={1}>
         <text fg={colors.text}>
-          It's not the fish, it's the fishing rod
-        </text>
-      </box>
-      <box marginBottom={1}>
-        <text fg={colors.muted}>
-          (I swear I wrote it by hand)
-        </text>
-      </box>
-      <box marginBottom={1}>
-        <text fg={colors.text}>
-          These packs enable you to one-shot a plugin, or... create a repo like this for yourself.
+          It's not the fish, it's the fishing rod <span style={{ fg: colors.muted }}>(I swear I wrote it by hand)</span>. These packs enable you to one-shot a plugin, or... create a repo like this for yourself.
         </text>
       </box>
 

@@ -37,6 +37,8 @@ This project is a **Workflow Selector CLI** built with Bun, Solid.js, and OpenTU
 
 <safety>
 ## Safety & Constraints
-- **Read-Only Paths**: `node_modules/` and `bun.lock` MUST NOT be modified manually.
+- **Read-Only Paths**: `node_modules/` and `bun.lockb` MUST NOT be modified manually.
 - **Process Isolation**: The CLI interacts with the host filesystem; ensure all path manipulations are relative to `ROOT_DIR`.
 </safety>
+
+Nested <text> inside <text> breaks rendering (AboutView freeze); use <span> for inline styling.

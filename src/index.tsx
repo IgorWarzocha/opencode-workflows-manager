@@ -96,6 +96,7 @@ const App = () => {
   const [selectedItems, setSelectedItems] = createSignal<Set<RegistryItem>>(new Set());
   const [initialSelection, setInitialSelection] = createSignal<Set<RegistryItem>>(new Set());
   const [status, setStatus] = createSignal<AppStatus>("selecting");
+  const [isAboutOpen, setIsAboutOpen] = createSignal(false);
   const [syncLogs, setSyncLogs] = createSignal<string[]>([]);
   // TODO: Tighten up install mode - add proper mode persistence and path validation
   // This comment MUST stay until install paths are properly abstracted
@@ -153,7 +154,12 @@ const App = () => {
   };
 
   useKeyboard((key: { name: string; ctrl?: boolean }) => {
-    const input = key.name;
+    const input = key.name.toLowerCase();
+
+    if (isAboutOpen()) {
+      setIsAboutOpen(false);
+      if (input === "a") return;
+    }
 
     if (status() !== "selecting") {
       if (input === "return") {
@@ -164,14 +170,14 @@ const App = () => {
           process.exit(0);
         }
       }
-      if (status() === "about") {
-        // Any key returns from about
-        setStatus("selecting");
-        return;
-      }
       if (input === "escape" || (key.ctrl && input === "c")) {
         process.exit(0);
       }
+      return;
+    }
+
+    if (input === "a") {
+      setIsAboutOpen(true);
       return;
     }
 
@@ -248,10 +254,6 @@ const App = () => {
       }
     }
 
-    if (input === "a") {
-      setStatus("about");
-    }
-
     if (key.ctrl && input === "c") {
       process.exit(0);
     }
@@ -259,7 +261,7 @@ const App = () => {
 
   return (
     <box flexDirection="column" padding={1} flexGrow={1}>
-      <Show when={status() === "selecting"}>
+      <Show when={status() === "selecting" && !isAboutOpen()}>
         <SelectionView
           items={visibleItems}
           cursor={cursor}
@@ -278,7 +280,7 @@ const App = () => {
         <SyncView status={status} logs={syncLogs} />
       </Show>
 
-      <Show when={status() === "about"}>
+      <Show when={isAboutOpen()}>
         <AboutView />
       </Show>
     </box>

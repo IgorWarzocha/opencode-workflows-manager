@@ -5,6 +5,7 @@
  */
 
 import { TextAttributes } from "@opentui/core";
+import { useTerminalDimensions } from "@opentui/solid";
 import { For, createMemo } from "solid-js";
 import type { Accessor } from "solid-js";
 import type { UIItem, RegistryItem, Pack, InstallMode } from "../types";
@@ -29,8 +30,18 @@ interface SelectionViewProps {
 }
 
 export function SelectionView(props: SelectionViewProps) {
+  const terminalDimensions = useTerminalDimensions();
   const modePath = () =>
     props.installMode() === "global" ? "~/.config/opencode/" : ".opencode/";
+
+  const contentWidth = createMemo(() => Math.max(0, terminalDimensions().width - 2));
+
+  const clampText = (value: string, maxLength: number) => {
+    if (maxLength <= 0) return "";
+    if (value.length <= maxLength) return value;
+    if (maxLength <= 3) return value.slice(0, maxLength);
+    return `${value.slice(0, Math.max(0, maxLength - 3))}...`;
+  };
 
   return (
     <>
@@ -107,10 +118,22 @@ export function SelectionView(props: SelectionViewProps) {
                 ? ` ${item.item.type}`
                 : "";
 
-            const description = item.description ? ` ${item.description}` : "";
-
             // Prefix: indent + chevron
             const prefix = `${indent}${chevron}`;
+
+            const description = createMemo(() => {
+              if (!item.description) return "";
+              const reservedWidth =
+                prefix.length +
+                checkbox().length +
+                item.title.length +
+                itemCount.length +
+                typeLabel.length;
+              const availableWidth = Math.max(0, contentWidth() - reservedWidth);
+              if (availableWidth <= 1) return "";
+              const trimmed = clampText(item.description, availableWidth - 1);
+              return trimmed ? ` ${trimmed}` : "";
+            });
 
             // Determine checkbox color: green for selected or partial, muted for empty (reactive memo)
             const checkboxColor = createMemo(() =>
@@ -149,9 +172,9 @@ export function SelectionView(props: SelectionViewProps) {
                     {typeLabel}
                   </text>
                 ) : null}
-                {description !== "" ? (
+                {description() !== "" ? (
                   <text fg={colors.muted}>
-                    {description}
+                    {description()}
                   </text>
                 ) : null}
               </box>
