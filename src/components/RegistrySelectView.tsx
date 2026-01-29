@@ -20,6 +20,7 @@ const colors = {
 interface RegistrySelectViewProps {
   sources: Accessor<RegistrySource[]>;
   cursor: Accessor<number>;
+  showAdminOption: boolean;
 }
 
 export function RegistrySelectView(props: RegistrySelectViewProps) {
@@ -43,7 +44,10 @@ export function RegistrySelectView(props: RegistrySelectViewProps) {
         <text fg={colors.muted}>↑↓ navigate | enter select | a about | esc exit</text>
       </box>
       <box flexDirection="column" flexGrow={1}>
-        <For each={[{ name: "Add/Update Repository", description: "Scan this repo and generate registry files.", url: "" }, ...props.sources()]}>
+        <For each={props.showAdminOption
+          ? [{ name: "Add/Update Repository", description: "Scan this repo and generate registry files.", url: "" }, ...props.sources()]
+          : props.sources()}
+        >
           {(source, index) => {
             const isCursor = createMemo(() => index() === props.cursor());
             const description = createMemo(() => {

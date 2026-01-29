@@ -35,6 +35,10 @@ export function AppAboutView() {
       </box>
 
       <box marginBottom={1}>
+        <text fg={colors.text}>Use the --admin flag to create or update registries from a repo.</text>
+      </box>
+
+      <box marginBottom={1}>
         <text fg={colors.primary} attributes={TextAttributes.BOLD}>
           Open, inspect, remix.
         </text>

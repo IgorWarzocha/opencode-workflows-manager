@@ -213,7 +213,7 @@ export function RegistryWizardView(props: RegistryWizardViewProps) {
       {props.step === "open-pr" ? (
         <box flexDirection="column">
           <text fg={colors.muted}>
-            Submit a PR here: https://github.com/IgorWarzocha/opencode-workflows-manager/compare
+            Submit a PR here: https://github.com/IgorWarzocha/opencode-workflows-manager/pulls
           </text>
           <box marginTop={1}>
             <text fg={colors.muted}>Open the PR page in your browser? (y/n)</text>

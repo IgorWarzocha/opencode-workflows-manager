@@ -11,13 +11,13 @@ import { useRegistryWizard } from "./hooks/useRegistryWizard";
 const App = () => {
   const terminalDimensions = useTerminalDimensions();
   const wizardRows = () => Math.max(5, terminalDimensions().height - 12);
+  const isAdminMode = process.argv.includes("--admin");
   
   const app = useAppLogic();
   const wizard = useRegistryWizard(wizardRows(), app.resetToRegistryMenu);
 
   onMount(() => {
-    const isLocalMode = process.argv.includes("--local");
-    app.loadInitialData(isLocalMode);
+    app.loadInitialData(isAdminMode);
   });
 
   useKeyboard((key: { name: string; ctrl?: boolean }) => {
@@ -45,7 +45,8 @@ const App = () => {
     //Registry Selection View
     if (app.status() === "selecting-registry") {
       const sources = app.registrySources();
-      const totalItems = sources.length + 1;
+      const offset = isAdminMode ? 1 : 0;
+      const totalItems = sources.length + offset;
       
       if (input === "a") {
         app.setIsAppAboutOpen(true);
@@ -54,10 +55,11 @@ const App = () => {
       } else if (input === "down" || input === "j") {
         app.setRegistryCursor((prev) => Math.min(totalItems - 1, prev + 1));
       } else if (input === "return") {
-        if (app.registryCursor() === 0) {
+        if (isAdminMode && app.registryCursor() === 0) {
           wizard.startWizard().then(() => app.setStatus("creating-registry"));
         } else {
-          app.handleRegistrySelection(app.registryCursor());
+          const sourceIndex = app.registryCursor() - offset + 1;
+          if (sourceIndex > 0) app.handleRegistrySelection(sourceIndex);
         }
       } else if (input === "escape") {
         app.resetToRegistryMenu();
@@ -105,11 +107,12 @@ const App = () => {
       } else if (step === "open-pr") {
         if (input === "y") {
           const opener = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-          Bun.spawn([opener, "https://github.com/IgorWarzocha/opencode-workflows-manager/compare"], { cwd: process.cwd() });
+          Bun.spawn([opener, "https://github.com/IgorWarzocha/opencode-workflows-manager/pulls"], { cwd: process.cwd() });
         }
         wizard.setStep("done");
       } else if (step === "done") {
         app.resetToRegistryMenu();
+        app.loadInitialData(true);
       }
       return;
     }
@@ -182,7 +185,7 @@ const App = () => {
   return (
     <box flexDirection="column" padding={1} flexGrow={1}>
       <Show when={app.status() === "selecting-registry" && !app.isAppAboutOpen()}>
-        <RegistrySelectView sources={app.registrySources} cursor={app.registryCursor} />
+        <RegistrySelectView sources={app.registrySources} cursor={app.registryCursor} showAdminOption={isAdminMode} />
       </Show>
 
       <Show when={app.status() === "selecting-registry" && app.isAppAboutOpen()}>
