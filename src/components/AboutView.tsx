@@ -4,6 +4,7 @@
  */
 
 import { TextAttributes } from "@opentui/core";
+import type { AppConfig } from "../registry-config";
 
 const colors = {
   primary: "#F59E0B",
@@ -13,8 +14,12 @@ const colors = {
   success: "#10B981",
 } as const;
 
-export function AboutView() {
-  const linkUrl = "https://github.com/IgorWarzocha/opencode-workflows-manager";
+interface AboutViewProps {
+  config: AppConfig;
+}
+
+export function AboutView(props: AboutViewProps) {
+  const about = () => props.config.ui.about;
   
   return (
     <box flexDirection="column" flexGrow={1} maxWidth={58}>
@@ -24,27 +29,15 @@ export function AboutView() {
         <text fg={colors.primary}>Opencode Workflows</text>
       </box>
 
-      <box marginBottom={1}>
-        <text fg={colors.text}>
-          We've all seen massive repositories full of skills and agents that nobody ever uses... But I bet you haven't seen any like these. I treat prompts like code. RFC 2119 keywords everywhere along with XML tags make for much more controlled experience with unwieldy models.
-        </text>
-      </box>
-
-      <box marginBottom={1}>
-        <text fg={colors.text}>
-          I actually update these because I use them every day. For 10 hours a day. I'm an automation freak. Coding is a byproduct. Something fails more than once? It will get updated.
-        </text>
-      </box>
-
-      <box marginBottom={1}>
-        <text fg={colors.text}>
-          It's not the fish, it's the fishing rod <span style={{ fg: colors.muted }}>(I swear I wrote it by hand)</span>. These packs enable you to one-shot a plugin, or... create a repo like this for yourself.
-        </text>
-      </box>
+      {about().lines.map((line) => (
+        <box marginBottom={1}>
+          <text fg={colors.text}>{line}</text>
+        </box>
+      ))}
 
       <box marginBottom={1}>
         <text fg={colors.primary} attributes={TextAttributes.BOLD}>
-          Markdown Is All You Need™
+          {about().emphasis}
         </text>
       </box>
 
@@ -56,18 +49,18 @@ export function AboutView() {
 
       <box marginBottom={1}>
         <text fg={colors.info}>
-          {linkUrl}
+          {about().link}
         </text>
       </box>
       <box marginBottom={1}>
         <text fg={colors.muted}>
-          I couldn't get the link to be clickable, lol. Sorry.
+          {about().linkNote}
         </text>
       </box>
 
       <box marginTop={1}>
         <text fg={colors.muted}>
-          Press any key to return...
+          {about().footer}
         </text>
       </box>
     </box>

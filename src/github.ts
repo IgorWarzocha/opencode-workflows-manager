@@ -4,8 +4,6 @@
  * Uses native fetch API available in Bun.
  */
 
-import { GITHUB_RAW_BASE } from "./config";
-
 export class GitHubFetchError extends Error {
   constructor(
     public readonly url: string,
@@ -18,20 +16,18 @@ export class GitHubFetchError extends Error {
 }
 
 /**
- * Fetches raw file content from the GitHub repository.
- * @param repoPath - Path relative to repository root (e.g., "registry.json")
+ * Fetches raw file content from a URL.
+ * @param url - Full URL to fetch
  * @returns The file content as a string
  */
-export async function fetchRawContent(repoPath: string): Promise<string> {
-  const url = `${GITHUB_RAW_BASE}/${repoPath}`;
-  
+export async function fetchRawContent(url: string): Promise<string> {
   const response = await fetch(url);
   
   if (!response.ok) {
     throw new GitHubFetchError(
       url,
       response.status,
-      `Failed to fetch ${repoPath}: ${response.status} ${response.statusText}`
+      `Failed to fetch ${url}: ${response.status} ${response.statusText}`
     );
   }
   
@@ -39,11 +35,11 @@ export async function fetchRawContent(repoPath: string): Promise<string> {
 }
 
 /**
- * Fetches and parses JSON content from the GitHub repository.
- * @param repoPath - Path relative to repository root (e.g., "registry.json")
+ * Fetches and parses JSON content from a URL.
+ * @param url - Full URL to fetch
  * @returns Parsed JSON content
  */
-export async function fetchJson<T>(repoPath: string): Promise<T> {
-  const content = await fetchRawContent(repoPath);
+export async function fetchJson<T>(url: string): Promise<T> {
+  const content = await fetchRawContent(url);
   return JSON.parse(content) as T;
 }

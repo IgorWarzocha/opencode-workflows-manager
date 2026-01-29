@@ -9,9 +9,12 @@ import { TextAttributes } from "@opentui/core";
 import { createSignal, createMemo, onMount, Show } from "solid-js";
 
 import type { Registry, RegistryItem, Pack, UIItem, AppStatus, Changes, InstallMode } from "./types";
-import { loadRegistry, getAllItems, findInstalledItems } from "./registry";
+import { getAllItems, findInstalledItems } from "./registry";
 import { performSync } from "./sync";
-import { SelectionView, ConfirmView, SyncView, AboutView } from "./components";
+import { loadRegistrySources, loadRegistryFromSource } from "./registries";
+import type { RegistrySource } from "./registries";
+import type { AppConfig } from "./registry-config";
+import { SelectionView, ConfirmView, SyncView, AboutView, RegistrySelectView, AppAboutView } from "./components";
 
 function buildVisibleItems(
   registry: Registry,
@@ -90,27 +93,40 @@ function buildVisibleItems(
 
 const App = () => {
   const [registry, setRegistry] = createSignal<Registry | null>(null);
+  const [appConfig, setAppConfig] = createSignal<AppConfig | null>(null);
+  const [registrySources, setRegistrySources] = createSignal<RegistrySource[]>([]);
+  const [registryCursor, setRegistryCursor] = createSignal(0);
   const [cursor, setCursor] = createSignal(0);
   const [expandedCategory, setExpandedCategory] = createSignal<string | null>("packs");
   const [expandedPack, setExpandedPack] = createSignal<string | null>(null);
   const [selectedItems, setSelectedItems] = createSignal<Set<RegistryItem>>(new Set());
   const [initialSelection, setInitialSelection] = createSignal<Set<RegistryItem>>(new Set());
-  const [status, setStatus] = createSignal<AppStatus>("selecting");
+  const [status, setStatus] = createSignal<AppStatus>("selecting-registry");
   const [isAboutOpen, setIsAboutOpen] = createSignal(false);
+  const [isAppAboutOpen, setIsAppAboutOpen] = createSignal(false);
   const [syncLogs, setSyncLogs] = createSignal<string[]>([]);
   // TODO: Tighten up install mode - add proper mode persistence and path validation
   // This comment MUST stay until install paths are properly abstracted
   const [installMode, setInstallMode] = createSignal<InstallMode>("global");
 
-  onMount(async () => {
-    const reg = await loadRegistry();
-    if (!reg) return;
-    setRegistry(reg);
+  const resetToRegistryMenu = () => {
+    setIsAboutOpen(false);
+    setIsAppAboutOpen(false);
+    setRegistry(null);
+    setAppConfig(null);
+    setCursor(0);
+    setExpandedCategory("packs");
+    setExpandedPack(null);
+    setSelectedItems(new Set<RegistryItem>());
+    setInitialSelection(new Set<RegistryItem>());
+    setSyncLogs([]);
+    setStatus("selecting-registry");
+  };
 
-    const allItems = getAllItems(reg);
-    const installed = await findInstalledItems(allItems, installMode());
-    setInitialSelection(installed);
-    setSelectedItems(new Set(installed));
+  onMount(async () => {
+    const sources = await loadRegistrySources();
+    setRegistrySources(sources);
+    if (sources.length === 0) return;
   });
 
   const visibleItems = createMemo(() => {
@@ -143,11 +159,14 @@ const App = () => {
 
   const changes = createMemo<Changes>(() => ({
     install: Array.from(selectedItems()).filter((i) => !initialSelection().has(i)),
+    refresh: Array.from(selectedItems()).filter((i) => initialSelection().has(i)),
     remove: Array.from(initialSelection()).filter((i) => !selectedItems().has(i)),
   }));
 
   const executeSync = async () => {
-    await performSync(changes(), installMode(), (msg) => {
+    const config = appConfig();
+    if (!config) return;
+    await performSync(changes(), installMode(), config, (msg) => {
       setSyncLogs((prev) => [...prev, msg]);
     });
     setStatus("done");
@@ -161,7 +180,50 @@ const App = () => {
       if (input === "a") return;
     }
 
+    if (isAppAboutOpen()) {
+      setIsAppAboutOpen(false);
+      if (input === "a") return;
+    }
+
     if (status() !== "selecting") {
+      if (status() === "selecting-registry") {
+        const sources = registrySources();
+        if (input === "a") {
+          setIsAppAboutOpen(true);
+          return;
+        }
+        if (input === "up" || input === "k") {
+          setRegistryCursor((prev) => Math.max(0, prev - 1));
+          return;
+        }
+        if (input === "down" || input === "j") {
+          setRegistryCursor((prev) => Math.min(sources.length - 1, prev + 1));
+          return;
+        }
+        if (input === "return") {
+          const target = sources[registryCursor()];
+          if (!target) return;
+          loadRegistryFromSource(target).then((loaded) => {
+            if (!loaded) return;
+            setAppConfig(loaded.config);
+            setRegistry(loaded.registry);
+            const allItems = getAllItems(loaded.registry);
+            findInstalledItems(allItems, installMode(), loaded.config).then((installed) => {
+              setInitialSelection(installed);
+              setSelectedItems(new Set(installed));
+            });
+            setStatus("selecting");
+          });
+        }
+        if (input === "escape") {
+          resetToRegistryMenu();
+          return;
+        }
+        if (key.ctrl && input === "c") {
+          process.exit(0);
+        }
+        return;
+      }
       if (input === "return") {
         if (status() === "confirming") {
           setStatus("syncing");
@@ -170,7 +232,11 @@ const App = () => {
           process.exit(0);
         }
       }
-      if (input === "escape" || (key.ctrl && input === "c")) {
+      if (input === "escape") {
+        resetToRegistryMenu();
+        return;
+      }
+      if (key.ctrl && input === "c") {
         process.exit(0);
       }
       return;
@@ -245,15 +311,21 @@ const App = () => {
       const newMode = installMode() === "global" ? "local" : "global";
       setInstallMode(newMode);
       const reg = registry();
+      const config = appConfig();
       if (reg) {
         const allItems = getAllItems(reg);
-        findInstalledItems(allItems, newMode).then((installed) => {
+        if (!config) return;
+        findInstalledItems(allItems, newMode, config).then((installed) => {
           setInitialSelection(installed);
           setSelectedItems(new Set(installed));
         });
       }
     }
 
+    if (input === "escape") {
+      resetToRegistryMenu();
+      return;
+    }
     if (key.ctrl && input === "c") {
       process.exit(0);
     }
@@ -261,14 +333,22 @@ const App = () => {
 
   return (
     <box flexDirection="column" padding={1} flexGrow={1}>
-      <Show when={status() === "selecting" && !isAboutOpen()}>
+      <Show when={status() === "selecting-registry" && !isAppAboutOpen()}>
+        <RegistrySelectView sources={registrySources} cursor={registryCursor} />
+      </Show>
+
+      <Show when={status() === "selecting-registry" && isAppAboutOpen()}>
+        <AppAboutView />
+      </Show>
+
+      <Show when={status() === "selecting" && !isAboutOpen() && appConfig()}>
         <SelectionView
           items={visibleItems}
           cursor={cursor}
           selectedItems={selectedItems}
           isPackSelected={isPackSelected}
           installMode={installMode}
-          title="Howaboua's Opencode Workflows"
+          title={`${appConfig()!.ui.brand}'s ${appConfig()!.ui.product}`}
         />
       </Show>
 
@@ -280,8 +360,8 @@ const App = () => {
         <SyncView status={status} logs={syncLogs} />
       </Show>
 
-      <Show when={isAboutOpen()}>
-        <AboutView />
+      <Show when={isAboutOpen() && appConfig()}>
+        <AboutView config={appConfig()!} />
       </Show>
     </box>
   );

@@ -15,11 +15,13 @@
   "dependencies": {
     "@babel/core": "^7.28.5",
     "@babel/preset-typescript": "^7.28.5",
+    "@iarna/toml": "^2.2.5",
     "@opentui/core": "^0.1.75",
     "@opentui/solid": "^0.1.75",
     "@types/fs-extra": "^11.0.4",
     "babel-preset-solid": "1.9.9",
     "fs-extra": "^11.3.3",
-    "solid-js": "1.9.9"
+    "solid-js": "1.9.9",
+    "xdg-basedir": "^5.1.0"
   }
 }

@@ -41,7 +41,13 @@ export interface UIItem {
   parent?: string;
 }
 
-export type AppStatus = "selecting" | "confirming" | "syncing" | "done" | "about";
+export type AppStatus =
+  | "selecting-registry"
+  | "selecting"
+  | "confirming"
+  | "syncing"
+  | "done"
+  | "about";
 
 // TODO: Tighten up install mode handling - make paths explicit and configurable
 // This comment MUST stay until the install paths are properly abstracted
@@ -49,5 +55,6 @@ export type InstallMode = "global" | "local";
 
 export interface Changes {
   install: RegistryItem[];
+  refresh: RegistryItem[];
   remove: RegistryItem[];
 }

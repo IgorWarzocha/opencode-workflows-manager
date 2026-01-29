@@ -7,23 +7,20 @@
 import fs from "fs-extra";
 import path from "path";
 import type { Registry, RegistryItem, Pack, InstallMode } from "./types";
-import { GLOBAL_INSTALL_DIR, LOCAL_INSTALL_DIR } from "./config";
-import { fetchJson } from "./github";
+import type { AppConfig } from "./registry-config";
 
-const PREFIXED_TYPES = new Set(["agent", "skill", "command"]);
-
-export function resolveTargetPath(item: RegistryItem, mode: InstallMode): string {
-  const baseDir = mode === "global" ? GLOBAL_INSTALL_DIR : LOCAL_INSTALL_DIR;
+export function resolveTargetPath(
+  item: RegistryItem,
+  mode: InstallMode,
+  config: AppConfig
+): string {
+  const baseDir = mode === "global" ? config.install.globalDir : config.install.localDir;
   
-  if (PREFIXED_TYPES.has(item.type)) {
+  if (config.install.prefixTypes.includes(item.type)) {
     return path.join(baseDir, item.target);
   }
   // For non-prefixed types (docs), install relative to cwd
   return path.join(process.cwd(), item.target);
-}
-
-export async function loadRegistry(): Promise<Registry | null> {
-  return fetchJson<Registry>("registry.json");
 }
 
 export function getAllItems(registry: Registry): RegistryItem[] {
@@ -35,11 +32,12 @@ export function getAllItems(registry: Registry): RegistryItem[] {
 
 export async function findInstalledItems(
   items: RegistryItem[],
-  mode: InstallMode
+  mode: InstallMode,
+  config: AppConfig
 ): Promise<Set<RegistryItem>> {
   const installed = new Set<RegistryItem>();
   for (const item of items) {
-    const exists = await fs.pathExists(resolveTargetPath(item, mode));
+    const exists = await fs.pathExists(resolveTargetPath(item, mode, config));
     if (exists) {
       installed.add(item);
     }

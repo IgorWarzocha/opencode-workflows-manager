@@ -57,7 +57,7 @@ export function SelectionView(props: SelectionViewProps) {
       </box>
       <box marginBottom={1}>
         <text fg={colors.muted}>
-          ↑↓ navigate · ←→ expand · space select · tab mode · enter sync · a about
+          up/down navigate | left/right expand | space select | tab mode | enter sync | a about | esc back
         </text>
       </box>
 
