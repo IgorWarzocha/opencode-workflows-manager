@@ -15,31 +15,27 @@ interface SelectionViewProps {
   selectedItems: Accessor<Set<RegistryItem>>;
   isPackSelected: (pack: Pack) => boolean;
   installMode: Accessor<InstallMode>;
+  title: string;
 }
 
 export function SelectionView(props: SelectionViewProps) {
-  const currentDescription = createMemo(
-    () => props.items()[props.cursor()]?.description || ""
-  );
-
   return (
     <>
-      <box flexDirection="column" marginBottom={1}>
-        <box>
-          <text attributes={TextAttributes.BOLD}>{props.selectedItems().size}</text>
-          <text attributes={TextAttributes.DIM}> selected | </text>
-          <text attributes={TextAttributes.BOLD}>
-            {props.installMode() === "global" ? "Global" : "Local"}
-          </text>
-          <text attributes={TextAttributes.DIM}>
-            {props.installMode() === "global"
-              ? " (~/.config/opencode/)"
-              : " (.opencode/)"}
-          </text>
-        </box>
-        <box height={1}>
-          <text attributes={TextAttributes.DIM}>{currentDescription()}</text>
-        </box>
+      <box flexDirection="row" marginBottom={1}>
+        <text attributes={TextAttributes.BOLD}>{props.title}</text>
+        <text attributes={TextAttributes.DIM}> | </text>
+        <text attributes={TextAttributes.BOLD}>{props.selectedItems().size}</text>
+        <text attributes={TextAttributes.DIM}> selected | </text>
+        <text attributes={TextAttributes.BOLD}>
+          {props.installMode() === "global" ? "Global" : "Local"}
+        </text>
+        <text attributes={TextAttributes.DIM}>
+          {props.installMode() === "global"
+            ? " (~/.config/opencode/)"
+            : " (.opencode/)"}
+        </text>
+      </box>
+      <box marginBottom={1}>
         <text attributes={TextAttributes.DIM}>
           j/k: Nav | h/l: Drill | Space: Toggle | Tab: Mode | Enter: Sync
         </text>
@@ -84,25 +80,39 @@ export function SelectionView(props: SelectionViewProps) {
             const itemCount =
               item.type === "pack" ? ` (${item.pack!.items.length})` : "";
 
+            const typeLabel =
+              item.type === "item" && item.item && item.parent?.startsWith("pack:")
+                ? `(${item.item.type}) `
+                : "";
+
+            const description = item.description ?? "";
+
+            const suffix = typeLabel || description ? ` ${typeLabel}${description}` : "";
+
+            const nameText = `${indent}${chevron}${checkbox}${item.title}`;
+
             return (
-              <box
-                backgroundColor={isCursor() ? "cyan" : undefined}
-                height={1}
-              >
+              <box height={1} flexDirection="row">
                 <text
                   attributes={
                     isCursor()
-                      ? TextAttributes.BOLD
-                      : item.type === "category"
-                        ? TextAttributes.BOLD
-                        : undefined
+                      ? TextAttributes.INVERSE | TextAttributes.BOLD
+                      : TextAttributes.BOLD
                   }
                 >
-                  {indent}
-                  {chevron}
-                  {checkbox}
-                  {item.title}
+                  {nameText}
+                </text>
+                <text attributes={isCursor() ? TextAttributes.INVERSE : undefined}>
                   {itemCount}
+                </text>
+                <text
+                  attributes={
+                    isCursor()
+                      ? TextAttributes.INVERSE | TextAttributes.ITALIC
+                      : TextAttributes.ITALIC
+                  }
+                >
+                  {suffix}
                 </text>
               </box>
             );

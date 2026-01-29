@@ -7,7 +7,8 @@
 import fs from "fs-extra";
 import path from "path";
 import type { Registry, RegistryItem, Pack, InstallMode } from "./types";
-import { ROOT_DIR, REGISTRY_PATH, GLOBAL_INSTALL_DIR, LOCAL_INSTALL_DIR } from "./config";
+import { GLOBAL_INSTALL_DIR, LOCAL_INSTALL_DIR } from "./config";
+import { fetchJson } from "./github";
 
 const PREFIXED_TYPES = new Set(["agent", "skill", "command"]);
 
@@ -17,15 +18,12 @@ export function resolveTargetPath(item: RegistryItem, mode: InstallMode): string
   if (PREFIXED_TYPES.has(item.type)) {
     return path.join(baseDir, item.target);
   }
-  return path.join(ROOT_DIR, item.target);
+  // For non-prefixed types (docs), install relative to cwd
+  return path.join(process.cwd(), item.target);
 }
 
 export async function loadRegistry(): Promise<Registry | null> {
-  const exists = await fs.pathExists(REGISTRY_PATH);
-  if (!exists) {
-    throw new Error(`Registry file not found at ${REGISTRY_PATH}`);
-  }
-  return fs.readJson(REGISTRY_PATH) as Promise<Registry>;
+  return fetchJson<Registry>("registry.json");
 }
 
 export function getAllItems(registry: Registry): RegistryItem[] {

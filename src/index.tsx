@@ -250,10 +250,6 @@ const App = () => {
 
   return (
     <box flexDirection="column" padding={1} flexGrow={1}>
-      <box marginBottom={1}>
-        <text attributes={TextAttributes.BOLD}>Howaboua's Opencode Workflows</text>
-      </box>
-
       <Show when={status() === "selecting"}>
         <SelectionView
           items={visibleItems}
@@ -261,6 +257,7 @@ const App = () => {
           selectedItems={selectedItems}
           isPackSelected={isPackSelected}
           installMode={installMode}
+          title="Howaboua's Opencode Workflows"
         />
       </Show>
 

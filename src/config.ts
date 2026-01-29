@@ -1,22 +1,20 @@
 /**
  * config.ts
- * Centralized path configuration for the workflow selector CLI.
- * Resolves paths relative to the repository root.
+ * Centralized path and GitHub configuration for the workflow selector CLI.
  */
 
 import path from "path";
-import { fileURLToPath } from "url";
 import { homedir } from "os";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-export const ROOT_DIR = path.join(__dirname, "../../");
-export const REGISTRY_PATH = path.join(ROOT_DIR, "registry.json");
-
 export const OPENCODE_PREFIX = ".opencode";
+
+// GitHub repository configuration
+export const GITHUB_OWNER = "IgorWarzocha";
+export const GITHUB_REPO = "Opencode-Workflows";
+export const GITHUB_BRANCH = "master";
+export const GITHUB_RAW_BASE = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}`;
 
 // TODO: Tighten up - make this configurable and explicit
 // This comment MUST stay until install paths are properly abstracted
 export const GLOBAL_INSTALL_DIR = path.join(homedir(), ".config", "opencode");
-export const LOCAL_INSTALL_DIR = path.join(ROOT_DIR, OPENCODE_PREFIX);
+export const LOCAL_INSTALL_DIR = path.join(process.cwd(), OPENCODE_PREFIX);

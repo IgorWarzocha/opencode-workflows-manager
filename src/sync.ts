@@ -1,14 +1,14 @@
 /**
  * sync.ts
  * Executes file sync operations: installing and removing workflow items.
- * Uses fs-extra for atomic copy and removal.
+ * Fetches content from GitHub and writes to local filesystem.
  */
 
 import fs from "fs-extra";
 import path from "path";
 import type { RegistryItem, Changes, InstallMode } from "./types";
-import { ROOT_DIR } from "./config";
 import { resolveTargetPath } from "./registry";
+import { fetchRawContent } from "./github";
 
 export type SyncLogCallback = (message: string) => void;
 
@@ -24,10 +24,10 @@ export async function performSync(
   }
 
   for (const item of changes.install) {
-    const source = path.join(ROOT_DIR, item.path);
+    const content = await fetchRawContent(item.path);
     const dest = resolveTargetPath(item, mode);
     await fs.ensureDir(path.dirname(dest));
-    await fs.copy(source, dest);
+    await fs.writeFile(dest, content, "utf-8");
     onLog(`Installed ${item.name}`);
   }
 }
