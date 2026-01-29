@@ -13,6 +13,13 @@ import { fetchRawContent } from "./github";
 
 export type SyncLogCallback = (message: string) => void;
 
+const DOWNLOAD_DELAY_MS = 500;
+
+const wait = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
 export async function performSync(
   changes: Changes,
   mode: InstallMode,
@@ -25,19 +32,18 @@ export async function performSync(
     onLog(`Removed ${item.name}`);
   }
 
-  for (const item of changes.install) {
-    const content = await fetchRawContent(item.path);
-    const dest = resolveTargetPath(item, mode, config);
-    await fs.ensureDir(path.dirname(dest));
-    await fs.writeFile(dest, content, "utf-8");
-    onLog(`Installed ${item.name}`);
-  }
+  const downloads = [...changes.install, ...changes.refresh];
+  let completed = 0;
 
-  for (const item of changes.refresh) {
+  for (const item of downloads) {
     const content = await fetchRawContent(item.path);
     const dest = resolveTargetPath(item, mode, config);
     await fs.ensureDir(path.dirname(dest));
     await fs.writeFile(dest, content, "utf-8");
-    onLog(`Updated ${item.name}`);
+    completed += 1;
+    onLog(`Synced ${completed}/${downloads.length}: ${item.name}`);
+    if (completed < downloads.length) {
+      await wait(DOWNLOAD_DELAY_MS);
+    }
   }
 }

@@ -68,8 +68,11 @@ function normalizePath(input: string): string {
 function getOpencodeConfigDir(): string {
   const override = process.env["OPENCODE_CONFIG_DIR"];
   if (override) return override;
-  if (xdgConfig) return path.join(xdgConfig, "opencode");
-  return path.join(homedir(), ".config", "opencode");
+  const baseConfigDir =
+    process.env["XDG_CONFIG_HOME"] ??
+    xdgConfig ??
+    path.join(homedir(), ".config");
+  return path.join(baseConfigDir, "opencode");
 }
 
 export function mergeConfig(base: AppConfig, override: PartialAppConfig | null): AppConfig {

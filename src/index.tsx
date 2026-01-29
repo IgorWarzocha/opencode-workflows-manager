@@ -123,6 +123,13 @@ const App = () => {
     setStatus("selecting-registry");
   };
 
+  const returnToSelection = () => {
+    setIsAboutOpen(false);
+    setIsAppAboutOpen(false);
+    setSyncLogs([]);
+    setStatus("selecting");
+  };
+
   onMount(async () => {
     const sources = await loadRegistrySources();
     setRegistrySources(sources);
@@ -233,7 +240,7 @@ const App = () => {
         }
       }
       if (input === "escape") {
-        resetToRegistryMenu();
+        returnToSelection();
         return;
       }
       if (key.ctrl && input === "c") {
