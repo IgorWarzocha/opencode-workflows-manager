@@ -6,3 +6,4 @@
 export { SelectionView } from "./SelectionView";
 export { ConfirmView } from "./ConfirmView";
 export { SyncView } from "./SyncView";
+export { AboutView } from "./AboutView";

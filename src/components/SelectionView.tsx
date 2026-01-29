@@ -46,7 +46,7 @@ export function SelectionView(props: SelectionViewProps) {
       </box>
       <box marginBottom={1}>
         <text fg={colors.muted}>
-          ↑↓ navigate · ←→ expand · space select · tab mode · enter sync
+          ↑↓ navigate · ←→ expand · space select · tab mode · enter sync · a about
         </text>
       </box>
 
@@ -62,6 +62,15 @@ export function SelectionView(props: SelectionViewProps) {
                   ? props.isPackSelected(item.pack!)
                   : false
             );
+
+            // Check if pack is partially selected (some but not all items)
+            const isPartiallySelected = createMemo(() => {
+              if (item.type !== "pack" || !item.pack) return false;
+              const selected = props.selectedItems();
+              const packItems = item.pack.items;
+              const selectedCount = packItems.filter(i => selected.has(i)).length;
+              return selectedCount > 0 && selectedCount < packItems.length;
+            });
 
             const indent =
               item.type === "category"
@@ -79,12 +88,16 @@ export function SelectionView(props: SelectionViewProps) {
                   : "▶ "
                 : "";
 
-            const checkbox =
+            // Checkbox: ● full, ◐ partial, ○ empty (reactive memo)
+            const checkbox = createMemo(() =>
               item.type === "item" || item.type === "pack"
                 ? isSelected()
                   ? "● "
-                  : "○ "
-                : "";
+                  : isPartiallySelected()
+                    ? "◐ "
+                    : "○ "
+                : ""
+            );
 
             const itemCount =
               item.type === "pack" ? ` (${item.pack!.items.length})` : "";
@@ -99,8 +112,12 @@ export function SelectionView(props: SelectionViewProps) {
             // Prefix: indent + chevron
             const prefix = `${indent}${chevron}`;
 
-            // Determine checkbox color
-            const checkboxColor = isSelected() ? colors.success : colors.muted;
+            // Determine checkbox color: green for selected or partial, muted for empty (reactive memo)
+            const checkboxColor = createMemo(() =>
+              isSelected() || isPartiallySelected() 
+                ? colors.success 
+                : colors.muted
+            );
 
             return (
               <box
@@ -111,24 +128,32 @@ export function SelectionView(props: SelectionViewProps) {
                 <text fg={colors.muted}>
                   {prefix}
                 </text>
-                <text fg={checkboxColor}>
-                  {checkbox}
-                </text>
+                {checkbox() !== "" ? (
+                  <text fg={checkboxColor()}>
+                    {checkbox()}
+                  </text>
+                ) : null}
                 <text
                   attributes={TextAttributes.BOLD}
                   fg={item.type === "category" ? colors.primary : colors.text}
                 >
                   {item.title}
                 </text>
-                <text fg={colors.info}>
-                  {itemCount}
-                </text>
-                <text fg={colors.info}>
-                  {typeLabel}
-                </text>
-                <text fg={colors.muted}>
-                  {description}
-                </text>
+                {itemCount !== "" ? (
+                  <text fg={colors.info}>
+                    {itemCount}
+                  </text>
+                ) : null}
+                {typeLabel !== "" ? (
+                  <text fg={colors.info}>
+                    {typeLabel}
+                  </text>
+                ) : null}
+                {description !== "" ? (
+                  <text fg={colors.muted}>
+                    {description}
+                  </text>
+                ) : null}
               </box>
             );
           }}

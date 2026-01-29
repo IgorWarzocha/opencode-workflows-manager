@@ -11,7 +11,7 @@ import { createSignal, createMemo, onMount, Show } from "solid-js";
 import type { Registry, RegistryItem, Pack, UIItem, AppStatus, Changes, InstallMode } from "./types";
 import { loadRegistry, getAllItems, findInstalledItems } from "./registry";
 import { performSync } from "./sync";
-import { SelectionView, ConfirmView, SyncView } from "./components";
+import { SelectionView, ConfirmView, SyncView, AboutView } from "./components";
 
 function buildVisibleItems(
   registry: Registry,
@@ -164,6 +164,11 @@ const App = () => {
           process.exit(0);
         }
       }
+      if (status() === "about") {
+        // Any key returns from about
+        setStatus("selecting");
+        return;
+      }
       if (input === "escape" || (key.ctrl && input === "c")) {
         process.exit(0);
       }
@@ -243,6 +248,10 @@ const App = () => {
       }
     }
 
+    if (input === "a") {
+      setStatus("about");
+    }
+
     if (key.ctrl && input === "c") {
       process.exit(0);
     }
@@ -267,6 +276,10 @@ const App = () => {
 
       <Show when={status() === "syncing" || status() === "done"}>
         <SyncView status={status} logs={syncLogs} />
+      </Show>
+
+      <Show when={status() === "about"}>
+        <AboutView />
       </Show>
     </box>
   );
