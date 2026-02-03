@@ -30,28 +30,12 @@ export function ConfirmView(props: ConfirmViewProps) {
   const columnLayout = createMemo(() => ({ colWidth: 20, gap: 1 }));
 
   const getPackName = (item: RegistryItem): string => {
-    let parts: string[];
-    try {
-      const url = new URL(item.path);
-      const pathParts = url.pathname.split("/").filter(Boolean);
-      if (url.hostname === "raw.githubusercontent.com" && pathParts.length >= 3) {
-        parts = pathParts.slice(3);
-      } else if (url.hostname === "github.com" && pathParts.length >= 4) {
-        const branchIndex = pathParts.indexOf("blob") !== -1 ? pathParts.indexOf("blob") + 1 : 2;
-        parts = pathParts.slice(branchIndex + 1);
-      } else {
-        parts = pathParts;
-      }
-    } catch {
-      parts = item.path.split("/").filter(Boolean);
-    }
-
+    const parts = item.path.split("/").filter(Boolean);
     const agentsIdx = parts.indexOf("agents");
     if (agentsIdx !== -1 && parts.length > agentsIdx + 1) {
       return parts[agentsIdx + 1] ?? "(root)";
     }
-    if (parts.length >= 1) return parts[0] ?? "(root)";
-    return "(root)";
+    return parts[0] ?? "(root)";
   };
 
   const buildSectionRows = (items: RegistryItem[]) => {
