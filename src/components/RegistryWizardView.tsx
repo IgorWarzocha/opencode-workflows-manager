@@ -28,7 +28,7 @@ interface RegistryWizardViewProps {
   selected: Set<string>;
   rootsSelectionState?: Map<string, { selected: boolean; partial: boolean }>;
   rootsInput: string;
-  typeOverrides: Map<string, "agent" | "skill" | "command" | "doc">;
+  typeOverrides: Map<string, "agent" | "skill" | "command" | "doc" | "pack">;
   repoUrl: string;
   aboutInline: boolean | null;
   name: string;
@@ -98,11 +98,12 @@ export function RegistryWizardView(props: RegistryWizardViewProps) {
                 const checked = createMemo(() => props.selected.has(node.id));
                 const checkbox = createMemo(() => checked() ? "● " : "○ ");
                 const indent = "  ".repeat(node.depth);
-                const displayType = createMemo(() => node.item?.repoPath
-                  ? props.typeOverrides.get(node.item.repoPath) ?? node.item?.type
-                  : node.item?.type);
+                const displayType = createMemo(() => {
+                  const repoPath = node.item?.repoPath ?? node.id.replace(/^path:/, "");
+                  return props.typeOverrides.get(repoPath) ?? node.item?.type;
+                });
                 const typeLabel = createMemo(() => displayType() ? ` ${displayType()}` : "");
-                const chevron = node.type === "group"
+                const chevron = node.type === "group" || node.type === "folder"
                   ? node.childrenLoaded && node.children.length === 0
                     ? "■ "
                     : props.expanded.has(node.id)

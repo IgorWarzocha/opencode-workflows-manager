@@ -4,7 +4,7 @@
 import { createSignal, createMemo } from "solid-js";
 import path from "path";
 import type { WizardNode } from "../registry-wizard/types";
-import type { RegistryItem } from "../types";
+import type { RegistryItem, ItemType } from "../types";
 import { scanWizardTree, flattenWizardTree, buildRegistryFromSelection, scanRootTree } from "../registry-wizard/scan";
 import { writeRegistryFiles } from "../registry-wizard/write";
 import { listDirectories, shouldSkipDir } from "../registry-wizard/fs-utils";
@@ -23,7 +23,7 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
   const [aboutInline, setAboutInline] = createSignal<boolean | null>(null);
   const [aboutText, setAboutText] = createSignal("");
   const [registryDescription, setRegistryDescription] = createSignal("");
-  const [typeOverrides, setTypeOverrides] = createSignal<Map<string, RegistryItem["type"]>>(new Map());
+  const [typeOverrides, setTypeOverrides] = createSignal<Map<string, ItemType | "pack">>(new Map());
   
   const [roots, setRoots] = createSignal<WizardNode[]>([]);
   const [rootsSelected, setRootsSelected] = createSignal<Set<string>>(new Set());
@@ -341,14 +341,26 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
       };
       toggleNode(current, next.has(current.id));
       setSelected(next);
-    } else if (input === "tab" && current?.item) {
-      const cycle = ["agent", "skill", "command", "doc"] as const;
-      const overrides = new Map(typeOverrides());
-      const currentType = overrides.get(current.item.repoPath) ?? current.item.type ?? "doc";
-      const idx = cycle.indexOf(currentType as typeof cycle[number]);
-      const nextType = cycle[(idx + 1) % cycle.length] as RegistryItem["type"];
-      overrides.set(current.item.repoPath, nextType);
-      setTypeOverrides(overrides);
+    } else if (input === "tab") {
+      if (current?.item) {
+        const cycle = ["agent", "skill", "command", "doc"] as const;
+        const overrides = new Map(typeOverrides());
+        const currentType = overrides.get(current.item.repoPath) ?? current.item.type ?? "doc";
+        const idx = cycle.indexOf(currentType as typeof cycle[number]);
+        const nextType = cycle[(idx + 1) % cycle.length] as RegistryItem["type"];
+        overrides.set(current.item.repoPath, nextType);
+        setTypeOverrides(overrides);
+      } else if (current?.type === "group" || current?.type === "folder") {
+        const overrides = new Map(typeOverrides());
+        const repoPath = current.id.replace(/^path:/, "");
+        const currentType = overrides.get(repoPath);
+        if (currentType === "pack") {
+          overrides.delete(repoPath);
+        } else {
+          overrides.set(repoPath, "pack");
+        }
+        setTypeOverrides(overrides);
+      }
     } else if (input === "return") {
       setStep("repo");
     }

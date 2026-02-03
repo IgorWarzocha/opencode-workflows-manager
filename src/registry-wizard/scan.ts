@@ -1,8 +1,9 @@
 //Scans a directory tree and constructs Wizard Nodes for registry selection.
 //Identifies agents, commands, skills, and documentation within the file structure.
 
+import fs from "fs-extra";
 import path from "path";
-import type { Registry, RegistryItem, Pack } from "../types";
+import type { Registry, RegistryItem, Pack, ItemType } from "../types";
 import type { WizardItem, WizardNode } from "./types";
 import { listFilesRecursive, listDirectories, shouldSkipDir } from "./fs-utils";
 import { buildItem, normalizeDescription, readFrontmatter } from "./item-builder";
@@ -50,44 +51,6 @@ export const scanRootTree = async (rootDir: string): Promise<WizardNode[]> => {
 };
 
 /**
- * Builds a wizard tree from a list of discovered items.
- */
-const buildTreeFromItems = (items: WizardItem[]): WizardNode[] => {
-  const nodes: WizardNode[] = [];
-  const treeRoots = new Map<string, WizardNode>();
-
-  items.forEach((item) => {
-    const segments = item.repoPath.split("/").filter(Boolean);
-    if (segments.length === 0) return;
-
-    let currentMap = treeRoots;
-    let currentNode: WizardNode | null = null;
-    let currentPath = "";
-
-    segments.forEach((segment, index) => {
-      currentPath = currentPath ? `${currentPath}/${segment}` : segment;
-      if (!currentMap.has(currentPath)) {
-        const isLeaf = index === segments.length - 1;
-        const node: WizardNode = {
-          id: `path:${currentPath}`,
-          label: segment,
-          type: isLeaf ? "item" : "group",
-          depth: index,
-          children: [],
-          item: isLeaf ? item : undefined,
-        };
-        currentMap.set(currentPath, node);
-        if (currentNode) currentNode.children.push(node); else nodes.push(node);
-      }
-      currentNode = currentMap.get(currentPath) ?? null;
-      if (!currentNode || currentNode.type === "item") return;
-    });
-  });
-
-  return nodes;
-};
-
-/**
  * Scans the workspace and builds wizard nodes for the selection interface.
  */
 export async function scanWizardTree(rootDir: string, allowedRoots: string[]): Promise<WizardNode[]> {
@@ -95,8 +58,10 @@ export async function scanWizardTree(rootDir: string, allowedRoots: string[]): P
   const allowedList = allowedRoots.map((root) => normalize(root.trim())).filter(Boolean);
   const allowedSet = new Set(allowedList);
   if (allowedSet.size === 0) return [];
-  const rawFiles = await listFilesRecursive(rootDir);
+
+  const rawFiles = await fs.readdir(rootDir, { withFileTypes: true, recursive: true });
   const items: WizardItem[] = [];
+  const directories = new Set<string>();
 
   const isAllowed = (filePath: string) => {
     const normalized = normalize(filePath);
@@ -106,11 +71,20 @@ export async function scanWizardTree(rootDir: string, allowedRoots: string[]): P
     return false;
   };
 
-  for (const file of rawFiles) {
-    if (!isAllowed(file)) continue;
-    const segments = file.split("/");
+  for (const entry of rawFiles) {
+    const relativePath = normalize(path.relative(rootDir, path.join(entry.parentPath, entry.name)));
+    if (!isAllowed(relativePath)) continue;
 
-    const basename = path.basename(file);
+    if (entry.isDirectory()) {
+      if (shouldSkipDir(entry.name)) continue;
+      directories.add(relativePath);
+      continue;
+    }
+
+    if (!entry.name.endsWith(".md")) continue;
+
+    const segments = relativePath.split("/");
+    const basename = entry.name;
     const { type, target } = resolveItemType(segments, basename);
     
     // Skip non-primary skill files (we only want the main skill.md)
@@ -118,14 +92,13 @@ export async function scanWizardTree(rootDir: string, allowedRoots: string[]): P
     // Skip if it was resolved as doc but inside skill dir (already handled by skill.md)
     if (type === "doc" && segments.includes("skill")) continue;
 
-    const fullPath = path.join(rootDir, file);
+    const fullPath = path.join(rootDir, relativePath);
     const frontmatter = await readFrontmatter(fullPath);
     const description = frontmatter.description ? normalizeDescription(frontmatter.description) : "";
-    let repoPath = file;
+    let repoPath = relativePath;
     
     if (type === "skill") {
       const opencodeIndex = segments.indexOf(".opencode");
-      const skillDir = segments[opencodeIndex + 2];
       repoPath = path.join(...segments.slice(0, opencodeIndex + 3));
     }
 
@@ -136,30 +109,55 @@ export async function scanWizardTree(rootDir: string, allowedRoots: string[]): P
     items.push(item);
   }
 
-  // Group items into packs and standalone
-  const packs = new Map<string, WizardItem[]>();
-  const standalone: WizardItem[] = [];
+  // Create nodes for all directories that were allowed
+  const nodes: WizardNode[] = [];
+  const nodeMap = new Map<string, WizardNode>();
 
-  items.forEach(item => {
-    if (item.packName) {
-      const list = packs.get(item.packName) ?? [];
-      list.push(item);
-      packs.set(item.packName, list);
-    } else {
-      standalone.push(item);
+  const getOrCreateNode = (fullPath: string, isFile = false, item?: WizardItem): WizardNode => {
+    const normalizedPath = normalize(fullPath);
+    if (nodeMap.has(normalizedPath)) {
+      const existing = nodeMap.get(normalizedPath)!;
+      if (item) existing.item = item;
+      return existing;
     }
+
+    const segments = normalizedPath.split("/");
+    const label = segments[segments.length - 1] ?? "";
+    const depth = segments.length - 1;
+    const node: WizardNode = {
+      id: `path:${normalizedPath}`,
+      label,
+      type: isFile ? "item" : "folder",
+      depth,
+      children: [],
+      item,
+    };
+
+    nodeMap.set(normalizedPath, node);
+
+    if (depth > 0) {
+      const parentPath = segments.slice(0, -1).join("/");
+      const parent = getOrCreateNode(parentPath);
+      parent.children.push(node);
+      parent.type = "group"; // Ensure parent is group if it has children
+    } else {
+      nodes.push(node);
+    }
+
+    return node;
+  };
+
+  // Add all files
+  items.forEach(item => {
+    getOrCreateNode(item.repoPath, true, item);
   });
 
-  // Dissolve packs that only contain agents (no commands/skills)
-  for (const [packName, packItems] of packs) {
-    const hasNonAgent = packItems.some(i => i.type !== "agent");
-    if (!hasNonAgent) {
-      packItems.forEach(i => standalone.push({ ...i, packName: undefined }));
-      packs.delete(packName);
-    }
-  }
+  // Add all directories to ensure full tree structure
+  directories.forEach(dir => {
+    getOrCreateNode(dir, false);
+  });
 
-  return buildTreeFromItems([...standalone, ...Array.from(packs.values()).flat()]);
+  return nodes.sort((a, b) => a.label.localeCompare(b.label));
 }
 
 /**
@@ -170,9 +168,12 @@ export function flattenWizardTree(nodes: WizardNode[], expanded: Set<string>): W
   const walk = (node: WizardNode) => {
     flat.push(node);
     if (node.type === "group" && !expanded.has(node.id)) return;
-    node.children.forEach(walk);
+    if (node.type === "folder" && !expanded.has(node.id)) return;
+    if (node.children) {
+      [...node.children].sort((a, b) => a.label.localeCompare(b.label)).forEach(walk);
+    }
   };
-  nodes.forEach(walk);
+  [...nodes].sort((a, b) => a.label.localeCompare(b.label)).forEach(walk);
   return flat;
 }
 
@@ -182,7 +183,7 @@ export function flattenWizardTree(nodes: WizardNode[], expanded: Set<string>): W
 export function buildRegistryFromSelection(
   selectedItems: WizardItem[],
   includeRoots: Set<string>,
-  overrides: Map<string, RegistryItem["type"]>
+  overrides: Map<string, ItemType | "pack">
 ): Registry {
   const packsByName = new Map<string, Pack>();
   const standalone: RegistryItem[] = [];
@@ -193,8 +194,54 @@ export function buildRegistryFromSelection(
     return includeRoots.has(root);
   });
 
+  // 1. Process Folders explicitly marked as Packs
+  for (const [repoPath, type] of overrides) {
+    if (type !== "pack") continue;
+
+    const packName = path.basename(repoPath);
+    const pack: Pack = {
+      name: packName,
+      description: "",
+      path: repoPath,
+      items: [],
+    };
+
+    // Find all selected items that belong to this folder
+    for (const item of filteredItems) {
+      if (item.repoPath.startsWith(`${repoPath}/`)) {
+        const effectiveType = (overrides.get(item.repoPath) ?? item.type ?? "doc") as ItemType;
+        pack.items.push({
+          name: item.name,
+          description: item.description,
+          type: effectiveType,
+          path: item.repoPath,
+          target: effectiveType === "doc"
+            ? path.basename(item.repoPath)
+            : effectiveType === "skill"
+              ? path.join("skill", item.name)
+              : path.join(effectiveType, `${item.name}.md`),
+        });
+      }
+    }
+
+    if (pack.items.length > 0) {
+      packsByName.set(repoPath, pack);
+    }
+  }
+
+  // 2. Process everything else (Standalone or implicit packs from agents/ folders)
   for (const item of filteredItems) {
-    const effectiveType = overrides.get(item.repoPath) ?? item.type ?? "doc";
+    // Skip if already included in an explicit pack
+    let inExplicitPack = false;
+    for (const [packPath] of packsByName) {
+      if (item.repoPath.startsWith(`${packPath}/`)) {
+        inExplicitPack = true;
+        break;
+      }
+    }
+    if (inExplicitPack) continue;
+
+    const effectiveType = (overrides.get(item.repoPath) ?? item.type ?? "doc") as ItemType;
     const registryItem: RegistryItem = {
       name: item.name,
       description: item.description,

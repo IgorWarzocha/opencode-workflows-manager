@@ -13,12 +13,12 @@ export interface WizardInputs {
   aboutInline: boolean;
 }
 
-export type WizardNodeType = "group" | "item";
+export type WizardNodeType = "group" | "item" | "folder";
 
 export interface WizardItem {
   name: string;
   description: string;
-  type: RegistryItem["type"];
+  type: RegistryItem["type"] | "pack";
   repoPath: string;
   target: string;
   packName?: string;
