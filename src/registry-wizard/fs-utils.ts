@@ -4,7 +4,7 @@
 import fs from "fs-extra";
 import path from "path";
 
-const EXCLUDED_DOCS = new Set(["README.md", "readme.md"]);
+const EXCLUDED_DOCS = new Set(["README.md", "readme.md", "README", "readme", "README.txt", "readme.txt"]);
 const EXCLUDED_DIRS = new Set(["node_modules", "build", "dist", ".git"]);
 
 export async function listMarkdownFiles(dirPath: string): Promise<string[]> {

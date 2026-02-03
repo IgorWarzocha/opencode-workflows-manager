@@ -97,7 +97,20 @@ export function RegistryWizardView(props: RegistryWizardViewProps) {
               {(node, index) => {
                 const isCursor = () => index() + props.scrollOffset === props.cursor;
                 const checked = createMemo(() => props.selected.has(node.id));
-                const checkbox = createMemo(() => checked() ? "● " : "○ ");
+                
+                // Calculate partial selection for folders/groups
+                const isPartial = createMemo(() => {
+                  if (node.type === "item") return false;
+                  if (checked()) return false;
+                  
+                  const walk = (n: WizardNode): boolean => {
+                    if (props.selected.has(n.id)) return true;
+                    return n.children.some(walk);
+                  };
+                  return node.children.some(walk);
+                });
+
+                const checkbox = createMemo(() => checked() ? "● " : isPartial() ? "◐ " : "○ ");
                 const indent = "  ".repeat(node.depth);
                 const displayType = createMemo(() => {
                   const repoPath = node.item?.repoPath ?? node.id.replace(/^path:/, "");
@@ -117,11 +130,12 @@ export function RegistryWizardView(props: RegistryWizardViewProps) {
                   : "";
                 const isPack = () => displayType() === "pack";
                 const labelColor = () => isPack() ? colors.info : colors.text;
+                const checkboxColor = createMemo(() => checked() || isPartial() ? colors.success : colors.muted);
                 
                 return (
                   <box height={1} flexDirection="row" backgroundColor={isCursor() ? "#4A4642" : undefined}>
                     <text fg={colors.muted}>{indent}</text>
-                    <text fg={checked() ? colors.success : colors.muted}>{checkbox()}</text>
+                    <text fg={checkboxColor()}>{checkbox()}</text>
                     {chevron !== "" ? <text fg={colors.muted}>{chevron}</text> : null}
                     <text fg={labelColor()}>{node.label}</text>
                     {typeLabel() !== "" ? <text fg={colors.info}>{typeLabel()}</text> : null}

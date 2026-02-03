@@ -13,8 +13,8 @@ import { buildItem, normalizeDescription, readFrontmatter } from "./item-builder
  */
 const resolveItemType = (segments: string[], basename: string): { type: RegistryItem["type"]; target: string } => {
   const isSkillFile = basename.toLowerCase() === "skill.md";
-
   const opencodeIndex = segments.indexOf(".opencode");
+  
   if (opencodeIndex !== -1) {
     const opencodeType = segments[opencodeIndex + 1];
     switch (opencodeType) {
@@ -33,22 +33,25 @@ const resolveItemType = (segments: string[], basename: string): { type: Registry
   }
 
   // Fallback: look for direct type folders (nearest to file wins)
-  if (segments.includes("command")) {
+  // We check segments.slice(0, -1) to exclude the filename itself
+  const parentSegments = segments.slice(0, -1);
+  
+  if (parentSegments.includes("command")) {
     return { type: "command", target: path.join("command", basename) };
   }
   
   if (isSkillFile) {
     const skillIdx = segments.lastIndexOf("skill");
-    const skillDir = skillIdx !== -1 ? segments[skillIdx + 1] : segments[segments.length - 1];
+    const skillDir = skillIdx !== -1 ? segments[skillIdx + 1] : segments[segments.length - 2];
     if (skillDir) return { type: "skill", target: path.join("skill", skillDir) };
   }
 
-  if (segments.includes("agent")) {
+  if (parentSegments.includes("agent")) {
     return { type: "agent", target: path.join("agent", basename) };
   }
 
-  // Only default to agent if directly in the root 'agents/' folder (depth 1)
-  if (segments[0] === "agents" && segments.length === 1) {
+  // Default to agent ONLY if directly in the root 'agents/' folder
+  if (segments[0] === "agents" && segments.length === 2) {
     return { type: "agent", target: path.join("agent", basename) };
   }
 
@@ -108,7 +111,8 @@ export async function scanWizardTree(rootDir: string, allowedRoots: string[]): P
 
     // Filter out registry files and readmes
     if (basename === "registry.json" || basename === "registry.toml") continue;
-    if (basename.toLowerCase() === "readme.md") continue;
+    const loweredBase = basename.toLowerCase();
+    if (loweredBase === "readme.md" || loweredBase === "readme.txt" || loweredBase === "readme") continue;
 
     const { type, target } = resolveItemType(segments, basename);
     
