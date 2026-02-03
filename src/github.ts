@@ -5,13 +5,14 @@
  */
 
 export class GitHubFetchError extends Error {
-  constructor(
-    public readonly url: string,
-    public readonly status: number,
-    message: string
-  ) {
+  public readonly url: string;
+  public readonly status: number;
+
+  constructor(url: string, status: number, message: string) {
     super(message);
     this.name = "GitHubFetchError";
+    this.url = url;
+    this.status = status;
   }
 }
 
@@ -21,17 +22,41 @@ export class GitHubFetchError extends Error {
  * @returns The file content as a string
  */
 export async function fetchRawContent(url: string): Promise<string> {
-  const response = await fetch(url);
-  
-  if (!response.ok) {
-    throw new GitHubFetchError(
-      url,
-      response.status,
-      `Failed to fetch ${url}: ${response.status} ${response.statusText}`
-    );
+  const MAX_RETRIES = 2;
+  const TIMEOUT_MS = 8000;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+
+      if (!response.ok) {
+        if (response.status >= 500 && attempt < MAX_RETRIES) {
+          continue;
+        }
+        throw new GitHubFetchError(
+          url,
+          response.status,
+          `Failed to fetch ${url}: ${response.status} ${response.statusText}`
+        );
+      }
+
+      return response.text();
+    } catch (error: unknown) {
+      lastError = error;
+      if (attempt < MAX_RETRIES) continue;
+      if (error instanceof GitHubFetchError) throw error;
+      throw new Error(`Failed to fetch ${url}`);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
-  
-  return response.text();
+
+  if (lastError instanceof Error) throw lastError;
+  throw new Error(`Failed to fetch ${url}`);
 }
 
 /**

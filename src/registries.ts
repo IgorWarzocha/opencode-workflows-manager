@@ -54,13 +54,9 @@ async function tryFetchRegistry(
     config = null;
   }
 
-  try {
-    const jsonUrl = new URL(REGISTRY_JSON, baseUrl).toString();
-    const registry = await fetchJson<Registry>(jsonUrl);
-    return { registry, config };
-  } catch {
-    return null;
-  }
+  const jsonUrl = new URL(REGISTRY_JSON, baseUrl).toString();
+  const registry = await fetchJson<Registry>(jsonUrl);
+  return { registry, config };
 }
 
 function withBaseUrls(registry: Registry, baseUrl: string): Registry {
@@ -80,18 +76,22 @@ function withBaseUrls(registry: Registry, baseUrl: string): Registry {
 }
 
 export async function loadRegistrySources(): Promise<RegistrySource[]> {
+  let lastError: unknown = null;
   for (const branch of REGISTRY_LIST_BRANCHES) {
     const url = `https://raw.githubusercontent.com/${REGISTRY_LIST_REPO}/${branch}/${REGISTRY_LIST_FILE}`;
     try {
       return await fetchJson<RegistrySource[]>(url);
     } catch {
-      // try next branch
+      lastError = new Error(`Failed to load registry list from ${url}`);
     }
   }
 
   const listPath = path.join(process.cwd(), REGISTRY_LIST_FILE);
   const exists = await fs.pathExists(listPath);
-  if (!exists) return [];
+  if (!exists) {
+    if (lastError instanceof Error) throw lastError;
+    throw new Error("Failed to load registry list");
+  }
   const raw = await fs.readFile(listPath, "utf-8");
   return JSON.parse(raw) as RegistrySource[];
 }
@@ -118,19 +118,29 @@ export async function loadRegistryFromSource(
   source: RegistrySource
 ): Promise<{ registry: Registry; config: AppConfig } | null> {
   const parsed = parseRepoUrl(source.url);
-  if (!parsed) return null;
+  if (!parsed) {
+    throw new Error(`Unsupported registry URL: ${source.url}`);
+  }
 
   let result: { registry: Registry; config: PartialAppConfig | null } | null = null;
+  let lastError: unknown = null;
   for (const branch of DEFAULT_BRANCHES) {
     const baseUrl = toRawBase(parsed.owner, parsed.repo, branch);
-    result = await tryFetchRegistry(baseUrl);
-    if (result) {
-      result.registry = withBaseUrls(result.registry, baseUrl);
-      break;
+    try {
+      result = await tryFetchRegistry(baseUrl);
+      if (result) {
+        result.registry = withBaseUrls(result.registry, baseUrl);
+        break;
+      }
+    } catch (error: unknown) {
+      lastError = error;
     }
   }
 
-  if (!result) return null;
+  if (!result) {
+    if (lastError instanceof Error) throw lastError;
+    throw new Error(`Failed to load registry from ${source.url}`);
+  }
 
   const config = mergeConfig(DEFAULT_CONFIG, result.config);
   return { registry: result.registry, config };

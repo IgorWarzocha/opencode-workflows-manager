@@ -26,7 +26,7 @@ export interface Registry {
   standalone: RegistryItem[];
 }
 
-export type UIItemType = "category" | "pack" | "item";
+export type UIItemType = "category" | "pack" | "folder" | "item";
 
 export interface UIItem {
   type: UIItemType;
@@ -34,6 +34,7 @@ export interface UIItem {
   title: string;
   description?: string;
   expanded?: boolean;
+  depth?: number;
   item?: RegistryItem;
   pack?: Pack;
   parent?: string;

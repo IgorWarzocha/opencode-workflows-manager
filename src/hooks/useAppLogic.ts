@@ -19,6 +19,7 @@ export const useAppLogic = () => {
   const [cursor, setCursor] = createSignal(0);
   const [expandedCategory, setExpandedCategory] = createSignal<string | null>("packs");
   const [expandedPack, setExpandedPack] = createSignal<string | null>(null);
+  const [expandedFolders, setExpandedFolders] = createSignal<Set<string>>(new Set());
   const [selectedItems, setSelectedItems] = createSignal<Set<RegistryItem>>(new Set());
   const [initialSelection, setInitialSelection] = createSignal<Set<RegistryItem>>(new Set());
   const [status, setStatus] = createSignal<AppStatus>("selecting-registry");
@@ -44,6 +45,7 @@ export const useAppLogic = () => {
     setCursor(0);
     setExpandedCategory("packs");
     setExpandedPack(null);
+    setExpandedFolders(new Set<string>());
     setSelectedItems(new Set<RegistryItem>());
     setInitialSelection(new Set<RegistryItem>());
     setSyncLogs([]);
@@ -68,27 +70,31 @@ export const useAppLogic = () => {
   };
 
   const loadInitialData = async (isAdmin: boolean) => {
-    const sources = await loadRegistrySources();
-    setRegistrySources(sources);
-
     if (isAdmin) {
       const local = await loadLocalRegistry();
       if (local) {
-        setAppConfig(local.config);
-        setRegistry(local.registry);
+        setRegistrySources([
+          {
+            name: "Local Registry",
+            description: "Current working directory",
+            url: "local",
+          },
+        ]);
         setInstallMode("local");
-        const allItems = getAllItems(local.registry);
-        const installed = await findInstalledItems(allItems, "local", local.config);
-        setInitialSelection(installed);
-        setSelectedItems(new Set(installed));
+      } else {
+        setRegistrySources([]);
       }
+      return;
     }
+
+    const sources = await loadRegistrySources();
+    setRegistrySources(sources);
   };
 
   const visibleItems = createMemo(() => {
     const reg = registry();
     if (!reg) return [];
-    return buildVisibleItems(reg, expandedCategory(), expandedPack(), installMode());
+    return buildVisibleItems(reg, expandedCategory(), expandedPack(), expandedFolders(), installMode());
   });
 
   createEffect(() => {
@@ -177,10 +183,23 @@ export const useAppLogic = () => {
     const sources = registrySources();
     const target = sources[sourceIndex - 1];
     if (!target) return;
-    
+
+    if (target.url === "local") {
+      const local = await loadLocalRegistry();
+      if (!local) return;
+      setAppConfig(local.config);
+      setRegistry(local.registry);
+      const allItems = getAllItems(local.registry);
+      const installed = await findInstalledItems(allItems, "local", local.config);
+      setInitialSelection(installed);
+      setSelectedItems(new Set(installed));
+      setStatus("selecting");
+      return;
+    }
+
     const loaded = await loadRegistryFromSource(target);
     if (!loaded) return;
-    
+
     setAppConfig(loaded.config);
     setRegistry(loaded.registry);
     const allItems = getAllItems(loaded.registry);
@@ -198,6 +217,7 @@ export const useAppLogic = () => {
     cursor, setCursor,
     expandedCategory, setExpandedCategory,
     expandedPack, setExpandedPack,
+    expandedFolders, setExpandedFolders,
     selectedItems, setSelectedItems,
     initialSelection,
     status, setStatus,

@@ -3,7 +3,7 @@
 
 import { createSignal, createMemo } from "solid-js";
 import path from "path";
-import type { WizardNode } from "../registry-wizard/types";
+import type { WizardNode, WizardItem } from "../registry-wizard/types";
 import type { RegistryItem, ItemType } from "../types";
 import { scanWizardTree, flattenWizardTree, buildRegistryFromSelection, scanRootTree } from "../registry-wizard/scan";
 import { writeRegistryFiles } from "../registry-wizard/write";
@@ -32,6 +32,7 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
   const [rootsCursor, setRootsCursor] = createSignal(0);
   const [rootsScroll, setRootsScroll] = createSignal(0);
   const [rootsExpanded, setRootsExpanded] = createSignal<Set<string>>(new Set());
+  const [selectedRootPaths, setSelectedRootPaths] = createSignal<Set<string>>(new Set());
   const rootsFlat = createMemo(() => flattenWizardTree(roots(), rootsExpanded()));
   const rootsSelectionState = createMemo(() => {
     type State = { selected: boolean; partial: boolean };
@@ -66,6 +67,43 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
   });
   
   const [summary, setSummary] = createSignal<{ packs: number; standalone: number; items: number } | null>(null);
+  const treeSelectionState = createMemo(() => {
+    type State = { selected: boolean; partial: boolean };
+    const map = new Map<string, State>();
+    const selectedSet = selected();
+
+    const walk = (node: WizardNode): State => {
+      if (node.type === "item") {
+        const state = { selected: selectedSet.has(node.id), partial: false } satisfies State;
+        map.set(node.id, state);
+        return state;
+      }
+
+      if (node.children.length === 0) {
+        const state = { selected: selectedSet.has(node.id), partial: false } satisfies State;
+        map.set(node.id, state);
+        return state;
+      }
+
+      let anySelected = false;
+      let allSelected = true;
+      for (const child of node.children) {
+        const childState = walk(child);
+        if (childState.selected || childState.partial) anySelected = true;
+        if (!childState.selected || childState.partial) allSelected = false;
+      }
+
+      const explicitSelected = selectedSet.has(node.id);
+      const selectedState = explicitSelected || allSelected;
+      const partial = !selectedState && anySelected;
+      const state = { selected: selectedState, partial } satisfies State;
+      map.set(node.id, state);
+      return state;
+    };
+
+    nodes().forEach(walk);
+    return map;
+  });
 
   const adjustScroll = (nextCursor: number, currentScroll: number, setScrollFn: (s: number) => void, listLength: number) => {
     let nextScroll = currentScroll;
@@ -141,6 +179,7 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
     const expandedRoots = new Set<string>();
     setRootsExpanded(expandedRoots);
     setRootsSelected(new Set<string>());
+    setSelectedRootPaths(new Set<string>());
     setSummary(null);
     setStep("roots");
   };
@@ -277,7 +316,12 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
         if (!covered) reduced.push(pathValue);
       }
 
-      const rootSelections = new Set(reduced);
+      const fallbackRoots = roots()
+        .map((node) => node.id.replace(/^root:/, "").replace(/\\/g, "/"))
+        .map((id) => id.replace(/^\/+|\/+$/g, ""))
+        .filter((id) => id.length > 0);
+      const rootSelections = new Set(reduced.length > 0 ? reduced : fallbackRoots);
+      setSelectedRootPaths(rootSelections);
       setStep("scanning");
       scanWizardTree(process.cwd(), Array.from(rootSelections)).then(async tree => {
         const expandedIds = new Set<string>();
@@ -376,7 +420,9 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
         if (checked) next.delete(node.id); else next.add(node.id);
         node.children.forEach(child => toggleNode(child, checked));
       };
-      toggleNode(current, next.has(current.id));
+      const state = treeSelectionState().get(current.id);
+      const isSelected = state?.selected ?? next.has(current.id);
+      toggleNode(current, isSelected);
       setSelected(next);
     } else if (input === "tab") {
       if (current?.item) {
@@ -425,16 +471,21 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
   };
 
   const finalize = () => {
-    const selectedItems = flatNodes()
-      .filter(n => n.type === "item" && selected().has(n.id) && n.item && !n.id.startsWith("structure:"))
-      .map(n => n.item!);
-    
-    const rootLabels = new Set(roots().filter(n => rootsSelected().has(n.id)).map(n => n.label));
+    const selectedSet = selected();
+    const selectedItems: WizardItem[] = [];
+    const walkSelected = (node: WizardNode) => {
+      if (node.type === "item" && node.item && selectedSet.has(node.id) && !node.id.startsWith("structure:")) {
+        selectedItems.push(node.item);
+      }
+      if (node.children.length > 0) node.children.forEach(walkSelected);
+    };
+    nodes().forEach(walkSelected);
+    const rootSelections = selectedRootPaths();
     const repoUrlStr = repoUrl().trim();
     const folderName = path.basename(process.cwd());
     const repoName = repoUrlStr.split("/").filter(Boolean).pop() ?? folderName;
-    
-    const registry = buildRegistryFromSelection(repoName, selectedItems, rootLabels, typeOverrides());
+
+    const registry = buildRegistryFromSelection(repoName, selectedItems, rootSelections, typeOverrides());
 
     writeRegistryFiles(process.cwd(), {
       name: repoName,
@@ -465,10 +516,12 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
     roots, rootsSelected,
     rootsFlat,
     rootsSelectionState,
+    treeSelectionState,
     rootsCursor, rootsScroll,
     rootsExpanded,
     summary,
     existingPaths,
+    selectedRootPaths,
     startWizard,
     handleRootsInput,
     handleTreeInput,

@@ -154,6 +154,12 @@ const App = () => {
           app.setExpandedPack(null);
         } else if (currentItem.type === "pack" && currentItem.pack) {
           app.setExpandedPack(currentItem.pack.name);
+        } else if (currentItem.type === "folder") {
+          app.setExpandedFolders((prev) => {
+            const next = new Set(prev);
+            next.add(currentItem.id);
+            return next;
+          });
         }
       } else if ((input === "left" || input === "h") && currentItem) {
         if (currentItem.type === "category") {
@@ -161,6 +167,17 @@ const App = () => {
         } else if (currentItem.type === "pack") {
           if (app.expandedPack() === currentItem.pack?.name) app.setExpandedPack(null);
           else app.setCursor(items.findIndex((i) => i.id === "packs"));
+        } else if (currentItem.type === "folder") {
+          const isExpanded = app.expandedFolders().has(currentItem.id);
+          if (isExpanded) {
+            app.setExpandedFolders((prev) => {
+              const next = new Set(prev);
+              next.delete(currentItem.id);
+              return next;
+            });
+          } else if (currentItem.parent) {
+            app.setCursor(items.findIndex((i) => i.id === currentItem.parent));
+          }
         } else if (currentItem.type === "item" && currentItem.parent) {
           app.setCursor(items.findIndex((i) => i.id === currentItem.parent));
         }
@@ -193,8 +210,8 @@ const App = () => {
       </Show>
 
       <Show when={app.status() === "creating-registry"}>
-        <RegistryWizardView
-          step={wizard.step()}
+          <RegistryWizardView
+            step={wizard.step()}
           nodes={wizard.step() === "roots"
             ? wizard.rootsFlat().slice(wizard.rootsScroll(), wizard.rootsScroll() + wizardRows())
             : wizard.flatNodes().slice(wizard.scroll(), wizard.scroll() + wizardRows())}
@@ -202,8 +219,9 @@ const App = () => {
           scrollOffset={wizard.step() === "roots" ? wizard.scroll() : wizard.scroll()}
           expanded={wizard.step() === "roots" ? wizard.rootsExpanded() : wizard.expanded()}
           selected={wizard.step() === "roots" ? wizard.rootsSelected() : wizard.selected()}
-          rootsSelectionState={wizard.step() === "roots" ? wizard.rootsSelectionState() : undefined}
-          rootsInput={wizard.roots().map((node) => node.label).join(", ")}
+            rootsSelectionState={wizard.step() === "roots" ? wizard.rootsSelectionState() : undefined}
+            treeSelectionState={wizard.step() === "tree" ? wizard.treeSelectionState() : undefined}
+            rootsInput={wizard.roots().map((node) => node.label).join(", ")}
           typeOverrides={wizard.typeOverrides()}
           repoUrl={wizard.repoUrl()}
           aboutInline={wizard.aboutInline()}

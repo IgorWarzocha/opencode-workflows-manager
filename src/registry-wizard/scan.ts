@@ -5,13 +5,24 @@ import fs from "fs-extra";
 import path from "path";
 import type { Registry, RegistryItem, Pack, ItemType } from "../types";
 import type { WizardItem, WizardNode } from "./types";
-import { listFilesRecursive, listDirectories, shouldSkipDir } from "./fs-utils";
+import { listDirectories, shouldSkipDir } from "./fs-utils";
 import { buildItem, normalizeDescription, readFrontmatter } from "./item-builder";
 
 const resolveItemType = (segments: string[], basename: string): { type: RegistryItem["type"]; target: string } => {
-  const isSkillFile = basename.toLowerCase() === "skill.md";
   const opencodeIndex = segments.indexOf(".opencode");
-  
+  const skillIdx = segments.indexOf("skill");
+
+  if (skillIdx !== -1) {
+    const skillDir = segments[skillIdx + 1];
+    const relativeFromSkill = segments.slice(skillIdx + 2);
+    if (skillDir && relativeFromSkill.length > 0) {
+      return {
+        type: "skill",
+        target: path.join("skill", skillDir, ...relativeFromSkill),
+      };
+    }
+  }
+
   if (opencodeIndex !== -1) {
     const opencodeType = segments[opencodeIndex + 1];
     switch (opencodeType) {
@@ -20,9 +31,9 @@ const resolveItemType = (segments: string[], basename: string): { type: Registry
       case "command":
         return { type: "command", target: path.join("command", basename) };
       case "skill": {
-        if (isSkillFile) {
-          const skillDir = segments[opencodeIndex + 2];
-          if (skillDir) return { type: "skill", target: path.join("skill", skillDir) };
+        const skillDir = segments[opencodeIndex + 2];
+        if (skillDir) {
+          return { type: "skill", target: path.join("skill", skillDir, basename) };
         }
         return { type: "doc", target: basename };
       }
@@ -37,10 +48,10 @@ const resolveItemType = (segments: string[], basename: string): { type: Registry
     return { type: "command", target: path.join("command", basename) };
   }
   
-  if (isSkillFile) {
-    const skillIdx = segments.lastIndexOf("skill");
-    const skillDir = skillIdx !== -1 ? segments[skillIdx + 1] : segments[segments.length - 2];
-    if (skillDir) return { type: "skill", target: path.join("skill", skillDir) };
+  if (segments.includes("skill")) {
+    const fallbackSkillIdx = segments.lastIndexOf("skill");
+    const skillDir = fallbackSkillIdx !== -1 ? segments[fallbackSkillIdx + 1] : undefined;
+    if (skillDir) return { type: "skill", target: path.join("skill", skillDir, basename) };
   }
 
   if (parentSegments.includes("agent")) {
@@ -75,47 +86,45 @@ export async function scanWizardTree(rootDir: string, allowedRoots: string[]): P
   const allowedSet = new Set(allowedList);
   if (allowedSet.size === 0) return [];
 
-  const rawFiles = await fs.readdir(rootDir, { withFileTypes: true, recursive: true });
+  const files: { relativePath: string; entry: fs.Dirent }[] = [];
   const items: WizardItem[] = [];
   const directories = new Set<string>();
-
-  const isAllowed = (filePath: string) => {
-    const normalized = normalize(filePath);
-    for (const root of allowedSet) {
-      if (normalized === root || normalized.startsWith(`${root}/`)) return true;
+  const walk = async (baseDir: string, baseLabel: string, relative = ""): Promise<void> => {
+    const dirPath = relative.length > 0 ? path.join(baseDir, relative) : baseDir;
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (shouldSkipDir(entry.name)) continue;
+        const next = relative.length > 0 ? path.join(relative, entry.name) : entry.name;
+        const relPath = normalize(path.join(baseLabel, next));
+        directories.add(relPath);
+        await walk(baseDir, baseLabel, next);
+      } else {
+        const next = relative.length > 0 ? path.join(relative, entry.name) : entry.name;
+        const relPath = normalize(path.join(baseLabel, next));
+        files.push({ relativePath: relPath, entry });
+      }
     }
-    return false;
   };
 
-  for (const entry of rawFiles) {
-    const relativePath = normalize(path.relative(rootDir, path.join(entry.parentPath, entry.name)));
-    if (!isAllowed(relativePath)) continue;
+  for (const root of allowedSet) {
+    if (shouldSkipDir(root)) continue;
+    const rootPath = path.join(rootDir, root);
+    if (!(await fs.pathExists(rootPath))) continue;
+    directories.add(root);
+    await walk(rootPath, root);
+  }
 
-    if (entry.isDirectory()) {
-      if (shouldSkipDir(entry.name)) continue;
-      directories.add(relativePath);
-      continue;
-    }
-
+  for (const { relativePath, entry } of files) {
     const segments = relativePath.split("/");
     const basename = entry.name;
 
-    // Filter out registry files and readmes
     if (basename === "registry.json" || basename === "registry.toml") continue;
     const loweredBase = basename.toLowerCase();
     if (loweredBase === "readme.md" || loweredBase === "readme.txt" || loweredBase === "readme") continue;
 
     const { type, target } = resolveItemType(segments, basename);
-    
-    // For non-markdown files, we only include them if they are part of a pack structure
-    // or if the user explicitly wants them. We'll set them as "doc" by default.
     const isMarkdown = entry.name.endsWith(".md");
-    if (isMarkdown) {
-      // Skip non-primary skill files (we only want the main skill.md)
-      if (type === "skill" && basename.toLowerCase() !== "skill.md") continue;
-      // Skip if it was resolved as doc but inside skill dir (already handled by skill.md)
-      if (type === "doc" && segments.includes("skill")) continue;
-    }
 
     const fullPath = path.join(rootDir, relativePath);
     let description = "";
@@ -127,21 +136,7 @@ export async function scanWizardTree(rootDir: string, allowedRoots: string[]): P
       if (frontmatter.name) resolvedName = frontmatter.name.trim();
     }
 
-    let repoPath = relativePath;
-    
-    if (type === "skill") {
-      const opencodeIdx = segments.indexOf(".opencode");
-      const skillIdx = segments.lastIndexOf("skill");
-      if (opencodeIdx !== -1) {
-        repoPath = segments.slice(0, opencodeIdx + 3).join("/");
-      } else if (skillIdx !== -1) {
-        repoPath = segments.slice(0, skillIdx + 2).join("/");
-      } else {
-        // Handle SKILL.md in a directory directly (repoPath is the directory)
-        repoPath = segments.slice(0, -1).join("/");
-      }
-    }
-
+    const repoPath = relativePath;
     const packName = (segments[0] === "agents" && segments.length > 1) ? segments[1] : undefined;
     const item = buildItem(type, resolvedName, repoPath, target, packName);
     item.description = description;
@@ -219,94 +214,62 @@ export function buildRegistryFromSelection(
   includeRoots: Set<string>,
   overrides: Map<string, ItemType | "pack">
 ): Registry {
-  const packsByName = new Map<string, Pack>();
+  const resolveTarget = (item: WizardItem, effectiveType: ItemType): string => {
+    if (effectiveType === "skill") return item.target;
+    if (effectiveType === "doc") return path.basename(item.repoPath);
+    return path.join(effectiveType, `${item.name}.md`);
+  };
+  const packsByRoot = new Map<string, Pack>();
   const standalone: RegistryItem[] = [];
 
   const filteredItems = selectedItems.filter((item) => {
     if (includeRoots.size === 0) return true;
-    const root = item.repoPath.split("/")[0] ?? "";
-    return includeRoots.has(root);
+    for (const root of includeRoots) {
+      if (item.repoPath === root || item.repoPath.startsWith(`${root}/`)) return true;
+    }
+    return false;
   });
 
-  // 1. Process Folders explicitly marked as Packs
-  for (const [repoPath, type] of overrides) {
-    if (type !== "pack") continue;
+  const explicitPackRoots = Array.from(overrides.entries())
+    .filter(([, type]) => type === "pack")
+    .map(([repoPath]) => repoPath)
+    .sort((a, b) => b.length - a.length);
 
-    const packName = path.basename(repoPath);
-    const pack: Pack = {
-      name: packName,
+  explicitPackRoots.forEach((repoPath) => {
+    packsByRoot.set(repoPath, {
+      name: path.basename(repoPath),
       description: "",
       path: repoPath,
       items: [],
       kind: "structure",
-    };
+    });
+  });
 
-    // Find all selected items that belong to this folder
-    for (const item of filteredItems) {
-      if (item.repoPath.startsWith(`${repoPath}/`)) {
-        const effectiveType = (overrides.get(item.repoPath) ?? item.type ?? "doc") as ItemType;
-        pack.items.push({
-          name: item.name,
-          description: item.description,
-          type: effectiveType,
-          path: item.repoPath,
-          target: effectiveType === "doc"
-            ? path.basename(item.repoPath)
-            : effectiveType === "skill"
-              ? path.join("skill", item.name)
-              : path.join(effectiveType, `${item.name}.md`),
-        });
-      }
-    }
-
-    if (pack.items.length > 0) {
-      packsByName.set(repoPath, pack);
-    }
-  }
-
-  // 2. Process everything else (Standalone or implicit packs from agents/ folders)
+  // Process items (standalone unless explicitly assigned to a pack root)
   for (const item of filteredItems) {
-    // Skip if already included in an explicit pack
-    let inExplicitPack = false;
-    for (const [packPath] of packsByName) {
-      if (item.repoPath.startsWith(`${packPath}/`)) {
-        inExplicitPack = true;
-        break;
-      }
-    }
-    if (inExplicitPack) continue;
-
     const effectiveType = (overrides.get(item.repoPath) ?? item.type ?? "doc") as ItemType;
     const registryItem: RegistryItem = {
       name: item.name,
       description: item.description,
       type: effectiveType,
       path: item.repoPath,
-      target: effectiveType === "doc"
-        ? path.basename(item.repoPath)
-        : effectiveType === "skill"
-          ? path.join("skill", item.name)
-          : path.join(effectiveType, `${item.name}.md`),
+      target: resolveTarget(item, effectiveType),
     };
-    
-    if (item.packName) {
-      const pack = packsByName.get(item.packName) ?? {
-        name: item.packName,
-        description: "",
-        path: path.join("agents", item.packName),
-        items: [],
-      };
-      pack.items.push(registryItem);
-      packsByName.set(item.packName, pack);
-    } else {
-      standalone.push(registryItem);
+
+    const packRoot = explicitPackRoots.find((root) => item.repoPath.startsWith(`${root}/`));
+    if (packRoot) {
+      const pack = packsByRoot.get(packRoot);
+      if (pack) pack.items.push(registryItem);
+      continue;
     }
+
+    standalone.push(registryItem);
   }
 
   return {
     name,
     version: "1.0.0",
-    packs: Array.from(packsByName.values()),
+    packs: Array.from(packsByRoot.values()).filter((pack) => pack.items.length > 0),
     standalone,
   };
 }

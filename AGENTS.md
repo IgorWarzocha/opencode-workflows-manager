@@ -2,6 +2,7 @@
 ## Verification & One-Shot Commands
 - **Type Check**: `bun x tsc --noEmit` (MANDATORY before submission).
 - **Registry Check**: `cat registry.toml` (Verify path mappings).
+- **Build Check**: `bun run build` (Verify successful compilation).
 - **Prohibited**: MUST NOT run `bun run dev` or any long-running process.
 </instructions>
 
@@ -17,7 +18,8 @@
 ## Core Routing
 | Component | Primary Files |
 |-----------|---------------|
-| UI Entry | `src/index.tsx`, `src/components.tsx` |
+| UI Entry | `src/index.tsx` |
+| Component Barrel | `src/components/index.ts` |
 | Registry Logic | `src/registries.ts`, `src/registry.ts`, `src/registry-config.ts` |
 | Sync Engine | `src/sync.ts` |
 | Wizard | `src/registry-wizard/*.ts` (scan, write, types) |

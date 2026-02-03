@@ -27,6 +27,7 @@ interface RegistryWizardViewProps {
   expanded: Set<string>;
   selected: Set<string>;
   rootsSelectionState?: Map<string, { selected: boolean; partial: boolean }>;
+  treeSelectionState?: Map<string, { selected: boolean; partial: boolean }>;
   rootsInput: string;
   typeOverrides: Map<string, "agent" | "skill" | "command" | "doc" | "pack">;
   repoUrl: string;
@@ -96,19 +97,9 @@ export function RegistryWizardView(props: RegistryWizardViewProps) {
             <For each={props.nodes}>
               {(node, index) => {
                 const isCursor = () => index() + props.scrollOffset === props.cursor;
-                const checked = createMemo(() => props.selected.has(node.id));
-                
-                // Calculate partial selection for folders/groups
-                const isPartial = createMemo(() => {
-                  if (node.type === "item") return false;
-                  if (checked()) return false;
-                  
-                  const walk = (n: WizardNode): boolean => {
-                    if (props.selected.has(n.id)) return true;
-                    return n.children.some(walk);
-                  };
-                  return node.children.some(walk);
-                });
+                const state = createMemo(() => props.treeSelectionState?.get(node.id));
+                const checked = createMemo(() => state()?.selected ?? props.selected.has(node.id));
+                const isPartial = createMemo(() => state()?.partial ?? false);
 
                 const checkbox = createMemo(() => checked() ? "● " : isPartial() ? "◐ " : "○ ");
                 const indent = "  ".repeat(node.depth);

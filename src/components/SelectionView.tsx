@@ -83,17 +83,10 @@ export function SelectionView(props: SelectionViewProps) {
               return selectedCount > 0 && selectedCount < packItems.length;
             });
 
-            const indent =
-              item.type === "category"
-                ? ""
-                : item.type === "pack"
-                  ? "  "
-                  : item.parent === "agents" || item.parent === "commands"
-                    ? "  "
-                    : "    ";
+            const indent = "  ".repeat(item.depth ?? 0);
 
             const chevron =
-              item.type === "category" || (item.type === "pack" && item.pack?.kind !== "structure")
+              item.type === "category" || item.type === "pack" || item.type === "folder"
                 ? item.expanded
                   ? "▼ "
                   : "▶ "

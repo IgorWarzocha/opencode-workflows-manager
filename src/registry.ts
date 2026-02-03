@@ -14,6 +14,9 @@ export function resolveTargetPath(
   mode: InstallMode,
   config: AppConfig
 ): string {
+  if (mode === "global" && item.type === "doc") {
+    throw new Error("Docs MUST NOT be installed in global mode");
+  }
   const baseDir = mode === "global" ? config.install.globalDir : config.install.localDir;
   
   if (config.install.prefixTypes.includes(item.type)) {

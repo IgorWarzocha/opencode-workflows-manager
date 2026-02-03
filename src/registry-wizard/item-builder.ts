@@ -5,7 +5,7 @@ import fs from "fs-extra";
 import path from "path";
 import type { RegistryItem } from "../types";
 import type { WizardItem } from "./types";
-import { listMarkdownFiles, shouldSkipDir } from "./fs-utils";
+import { shouldSkipDir } from "./fs-utils";
 
 export function buildItem(
   type: RegistryItem["type"],
