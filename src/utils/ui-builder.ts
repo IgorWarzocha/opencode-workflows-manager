@@ -28,7 +28,8 @@ export function buildVisibleItems(
 
     if (packsExpanded) {
       for (const pack of registry.packs) {
-        const packExpanded = expandedPack === pack.name;
+        const isStructure = pack.kind === "structure";
+        const packExpanded = !isStructure && expandedPack === pack.name;
         items.push({
           type: "pack",
           id: `pack:${pack.name}`,

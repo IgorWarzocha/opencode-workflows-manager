@@ -35,6 +35,7 @@ interface RegistryWizardViewProps {
   description: string;
   registryDescription: string;
   summary: WizardSummary | null;
+  existingPaths: Set<string>;
 }
 
 export function RegistryWizardView(props: RegistryWizardViewProps) {
@@ -103,6 +104,10 @@ export function RegistryWizardView(props: RegistryWizardViewProps) {
                   return props.typeOverrides.get(repoPath) ?? node.item?.type;
                 });
                 const typeLabel = createMemo(() => displayType() ? ` ${displayType()}` : "");
+                const isExisting = createMemo(() => {
+                  const repoPath = node.item?.repoPath ?? node.id.replace(/^path:/, "");
+                  return props.existingPaths.has(repoPath);
+                });
                 const chevron = node.type === "group" || node.type === "folder"
                   ? node.childrenLoaded && node.children.length === 0
                     ? "■ "
@@ -110,13 +115,17 @@ export function RegistryWizardView(props: RegistryWizardViewProps) {
                       ? "▼ "
                       : "▶ "
                   : "";
+                const isPack = () => displayType() === "pack";
+                const labelColor = () => isPack() ? colors.info : colors.text;
+                
                 return (
                   <box height={1} flexDirection="row" backgroundColor={isCursor() ? "#4A4642" : undefined}>
                     <text fg={colors.muted}>{indent}</text>
                     <text fg={checked() ? colors.success : colors.muted}>{checkbox()}</text>
                     {chevron !== "" ? <text fg={colors.muted}>{chevron}</text> : null}
-                    <text fg={colors.text}>{node.label}</text>
+                    <text fg={labelColor()}>{node.label}</text>
                     {typeLabel() !== "" ? <text fg={colors.info}>{typeLabel()}</text> : null}
+                    {isExisting() ? <text fg={colors.muted}> [Included]</text> : null}
                   </box>
                 );
               }}

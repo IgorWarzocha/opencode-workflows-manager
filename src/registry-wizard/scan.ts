@@ -12,25 +12,47 @@ import { buildItem, normalizeDescription, readFrontmatter } from "./item-builder
  * Identifies the type and target path of a file based on its location in the directory tree.
  */
 const resolveItemType = (segments: string[], basename: string): { type: RegistryItem["type"]; target: string } => {
-  const opencodeIndex = segments.indexOf(".opencode");
-  if (opencodeIndex === -1) return { type: "doc", target: basename };
+  const isSkillFile = basename.toLowerCase() === "skill.md";
 
-  const opencodeType = segments[opencodeIndex + 1];
-  switch (opencodeType) {
-    case "agent":
-      return { type: "agent", target: path.join("agent", basename) };
-    case "command":
-      return { type: "command", target: path.join("command", basename) };
-    case "skill": {
-      const skillDir = segments[opencodeIndex + 2];
-      if (basename.toLowerCase() === "skill.md" && skillDir) {
-        return { type: "skill", target: path.join("skill", skillDir) };
+  const opencodeIndex = segments.indexOf(".opencode");
+  if (opencodeIndex !== -1) {
+    const opencodeType = segments[opencodeIndex + 1];
+    switch (opencodeType) {
+      case "agent":
+        return { type: "agent", target: path.join("agent", basename) };
+      case "command":
+        return { type: "command", target: path.join("command", basename) };
+      case "skill": {
+        if (isSkillFile) {
+          const skillDir = segments[opencodeIndex + 2];
+          if (skillDir) return { type: "skill", target: path.join("skill", skillDir) };
+        }
+        return { type: "doc", target: basename };
       }
-      return { type: "doc", target: basename };
     }
-    default:
-      return { type: "doc", target: basename };
   }
+
+  // Fallback: look for direct type folders (nearest to file wins)
+  if (segments.includes("command")) {
+    return { type: "command", target: path.join("command", basename) };
+  }
+  
+  if (isSkillFile) {
+    const skillIdx = segments.lastIndexOf("skill");
+    const skillDir = skillIdx !== -1 ? segments[skillIdx + 1] : segments[segments.length - 1];
+    if (skillDir) return { type: "skill", target: path.join("skill", skillDir) };
+  }
+
+  if (segments.includes("agent")) {
+    return { type: "agent", target: path.join("agent", basename) };
+  }
+
+  // Only default to agent if directly in the root 'agents/' folder (depth 1)
+  if (segments[0] === "agents" && segments.length === 1) {
+    return { type: "agent", target: path.join("agent", basename) };
+  }
+
+  return { type: "doc", target: basename };
 };
 
 /**
@@ -81,29 +103,51 @@ export async function scanWizardTree(rootDir: string, allowedRoots: string[]): P
       continue;
     }
 
-    if (!entry.name.endsWith(".md")) continue;
-
     const segments = relativePath.split("/");
     const basename = entry.name;
+
+    // Filter out registry files and readmes
+    if (basename === "registry.json" || basename === "registry.toml") continue;
+    if (basename.toLowerCase() === "readme.md") continue;
+
     const { type, target } = resolveItemType(segments, basename);
     
-    // Skip non-primary skill files (we only want the main skill.md)
-    if (type === "skill" && basename.toLowerCase() !== "skill.md") continue;
-    // Skip if it was resolved as doc but inside skill dir (already handled by skill.md)
-    if (type === "doc" && segments.includes("skill")) continue;
+    // For non-markdown files, we only include them if they are part of a pack structure
+    // or if the user explicitly wants them. We'll set them as "doc" by default.
+    const isMarkdown = entry.name.endsWith(".md");
+    if (isMarkdown) {
+      // Skip non-primary skill files (we only want the main skill.md)
+      if (type === "skill" && basename.toLowerCase() !== "skill.md") continue;
+      // Skip if it was resolved as doc but inside skill dir (already handled by skill.md)
+      if (type === "doc" && segments.includes("skill")) continue;
+    }
 
     const fullPath = path.join(rootDir, relativePath);
-    const frontmatter = await readFrontmatter(fullPath);
-    const description = frontmatter.description ? normalizeDescription(frontmatter.description) : "";
+    let description = "";
+    let resolvedName = basename.replace(/\.md$/i, "");
+
+    if (isMarkdown) {
+      const frontmatter = await readFrontmatter(fullPath);
+      description = frontmatter.description ? normalizeDescription(frontmatter.description) : "";
+      if (frontmatter.name) resolvedName = frontmatter.name.trim();
+    }
+
     let repoPath = relativePath;
     
     if (type === "skill") {
-      const opencodeIndex = segments.indexOf(".opencode");
-      repoPath = path.join(...segments.slice(0, opencodeIndex + 3));
+      const opencodeIdx = segments.indexOf(".opencode");
+      const skillIdx = segments.lastIndexOf("skill");
+      if (opencodeIdx !== -1) {
+        repoPath = segments.slice(0, opencodeIdx + 3).join("/");
+      } else if (skillIdx !== -1) {
+        repoPath = segments.slice(0, skillIdx + 2).join("/");
+      } else {
+        // Handle SKILL.md in a directory directly (repoPath is the directory)
+        repoPath = segments.slice(0, -1).join("/");
+      }
     }
 
     const packName = (segments[0] === "agents" && segments.length > 1) ? segments[1] : undefined;
-    const resolvedName = frontmatter.name?.trim() || basename.replace(/\.md$/i, "");
     const item = buildItem(type, resolvedName, repoPath, target, packName);
     item.description = description;
     items.push(item);
@@ -205,6 +249,7 @@ export function buildRegistryFromSelection(
       description: "",
       path: repoPath,
       items: [],
+      kind: "structure",
     };
 
     // Find all selected items that belong to this folder

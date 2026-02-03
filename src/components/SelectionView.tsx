@@ -93,7 +93,7 @@ export function SelectionView(props: SelectionViewProps) {
                     : "    ";
 
             const chevron =
-              item.type === "category" || item.type === "pack"
+              item.type === "category" || (item.type === "pack" && item.pack?.kind !== "structure")
                 ? item.expanded
                   ? "▼ "
                   : "▶ "

@@ -8,6 +8,7 @@ import type { RegistryItem, ItemType } from "../types";
 import { scanWizardTree, flattenWizardTree, buildRegistryFromSelection, scanRootTree } from "../registry-wizard/scan";
 import { writeRegistryFiles } from "../registry-wizard/write";
 import { listDirectories, shouldSkipDir } from "../registry-wizard/fs-utils";
+import { loadLocalRegistry } from "../registries";
 
 export type WizardStep = "roots" | "tree" | "repo" | "description" | "about" | "about-text" | "scanning" | "done" | "open-files" | "open-pr";
 
@@ -24,6 +25,7 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
   const [aboutText, setAboutText] = createSignal("");
   const [registryDescription, setRegistryDescription] = createSignal("");
   const [typeOverrides, setTypeOverrides] = createSignal<Map<string, ItemType | "pack">>(new Map());
+  const [existingPaths, setExistingIds] = createSignal<Set<string>>(new Set());
   
   const [roots, setRoots] = createSignal<WizardNode[]>([]);
   const [rootsSelected, setRootsSelected] = createSignal<Set<string>>(new Set());
@@ -83,6 +85,8 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
 
   const startWizard = async () => {
     const rootsTree = await scanRootTree(process.cwd());
+    const local = await loadLocalRegistry();
+    
     setNodes([]);
     setFlatNodes([]);
     setSelected(new Set<string>());
@@ -97,7 +101,31 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
     setRegistryDescription("");
     setAboutInline(null);
     setAboutText("");
-    setTypeOverrides(new Map());
+    const overrides = new Map<string, ItemType | "pack">();
+    const existing = new Set<string>();
+    
+    if (local) {
+      setRepoUrl(local.config.ui.about.link);
+      setRegistryDescription(local.registry.name);
+      setAboutText(local.config.ui.about.lines.join("\n"));
+      
+      local.registry.standalone.forEach(item => {
+        existing.add(item.path);
+        overrides.set(item.path, item.type);
+      });
+      
+      local.registry.packs.forEach(pack => {
+        existing.add(pack.path);
+        overrides.set(pack.path, "pack");
+        pack.items.forEach(item => {
+          existing.add(item.path);
+          overrides.set(item.path, item.type);
+        });
+      });
+    }
+    
+    setTypeOverrides(overrides);
+    setExistingIds(existing);
 
     const rootNodes = rootsTree.length > 0
       ? rootsTree
@@ -258,7 +286,20 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
         setExpanded(expandedIds);
         const flat = flattenWizardTree(tree, expandedIds);
         const selectedIds = new Set<string>();
-        flat.forEach(n => selectedIds.add(n.id));
+        const existing = existingPaths();
+        
+        flat.forEach(n => {
+          const repoPath = n.item?.repoPath ?? n.id.replace(/^path:/, "");
+          if (existing.has(repoPath)) {
+            selectedIds.add(n.id);
+          } else if (n.item) {
+            // Also select newly discovered items by default if they are MD files?
+            // Actually, for sync/edit, maybe we shouldn't auto-select everything new.
+            // But for "Add", we should.
+            // Let's keep existing behavior of selecting all for now if no existing registry?
+            if (existing.size === 0) selectedIds.add(n.id);
+          }
+        });
         
         setNodes(tree);
         setFlatNodes(flat);
@@ -354,10 +395,19 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
         const overrides = new Map(typeOverrides());
         const repoPath = current.id.replace(/^path:/, "");
         const currentType = overrides.get(repoPath);
+        
         if (currentType === "pack") {
           overrides.delete(repoPath);
         } else {
           overrides.set(repoPath, "pack");
+          // Automatically select the folder if it's marked as a pack
+          const nextSelected = new Set(selected());
+          const toggleNode = (node: WizardNode, shouldSelect: boolean) => {
+            if (shouldSelect) nextSelected.add(node.id); else nextSelected.delete(node.id);
+            node.children.forEach(child => toggleNode(child, shouldSelect));
+          };
+          toggleNode(current, true);
+          setSelected(nextSelected);
         }
         setTypeOverrides(overrides);
       }
@@ -422,6 +472,7 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
     rootsCursor, rootsScroll,
     rootsExpanded,
     summary,
+    existingPaths,
     startWizard,
     handleRootsInput,
     handleTreeInput,

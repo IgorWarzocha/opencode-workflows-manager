@@ -211,6 +211,7 @@ const App = () => {
           description={wizard.aboutText()}
           registryDescription={wizard.registryDescription()}
           summary={wizard.summary()}
+          existingPaths={wizard.existingPaths()}
         />
       </Show>
 

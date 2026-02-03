@@ -16,6 +16,7 @@ export interface Pack {
   description: string;
   path: string;
   items: RegistryItem[];
+  kind?: "structure";
 }
 
 export interface Registry {
