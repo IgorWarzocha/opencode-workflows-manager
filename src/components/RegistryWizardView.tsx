@@ -98,10 +98,10 @@ export function RegistryWizardView(props: RegistryWizardViewProps) {
                 const checked = createMemo(() => props.selected.has(node.id));
                 const checkbox = createMemo(() => checked() ? "● " : "○ ");
                 const indent = "  ".repeat(node.depth);
-                const displayType = node.item?.repoPath
+                const displayType = createMemo(() => node.item?.repoPath
                   ? props.typeOverrides.get(node.item.repoPath) ?? node.item?.type
-                  : node.item?.type;
-                const typeLabel = displayType ? ` ${displayType}` : "";
+                  : node.item?.type);
+                const typeLabel = createMemo(() => displayType() ? ` ${displayType()}` : "");
                 const chevron = node.type === "group"
                   ? node.childrenLoaded && node.children.length === 0
                     ? "■ "
@@ -115,7 +115,7 @@ export function RegistryWizardView(props: RegistryWizardViewProps) {
                     <text fg={checked() ? colors.success : colors.muted}>{checkbox()}</text>
                     {chevron !== "" ? <text fg={colors.muted}>{chevron}</text> : null}
                     <text fg={colors.text}>{node.label}</text>
-                    {typeLabel !== "" ? <text fg={colors.muted}>{typeLabel}</text> : null}
+                    {typeLabel() !== "" ? <text fg={colors.info}>{typeLabel()}</text> : null}
                   </box>
                 );
               }}

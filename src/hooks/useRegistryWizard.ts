@@ -345,8 +345,9 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
       const cycle = ["agent", "skill", "command", "doc"] as const;
       const overrides = new Map(typeOverrides());
       const currentType = overrides.get(current.item.repoPath) ?? current.item.type ?? "doc";
-      const idx = cycle.indexOf(currentType as (typeof cycle)[number]);
-      overrides.set(current.item.repoPath, cycle[(idx + 1) % cycle.length] as RegistryItem["type"]);
+      const idx = cycle.indexOf(currentType as typeof cycle[number]);
+      const nextType = cycle[(idx + 1) % cycle.length] as RegistryItem["type"];
+      overrides.set(current.item.repoPath, nextType);
       setTypeOverrides(overrides);
     } else if (input === "return") {
       setStep("repo");
