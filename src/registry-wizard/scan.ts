@@ -181,6 +181,7 @@ export function flattenWizardTree(nodes: WizardNode[], expanded: Set<string>): W
  * Generates a Registry definition from the user's wizard selections.
  */
 export function buildRegistryFromSelection(
+  name: string,
   selectedItems: WizardItem[],
   includeRoots: Set<string>,
   overrides: Map<string, ItemType | "pack">
@@ -269,7 +270,7 @@ export function buildRegistryFromSelection(
   }
 
   return {
-    name: "opencode-workflows",
+    name,
     version: "1.0.0",
     packs: Array.from(packsByName.values()),
     standalone,

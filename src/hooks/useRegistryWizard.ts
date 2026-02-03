@@ -384,9 +384,11 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
       .map(n => n.item!);
     
     const rootLabels = new Set(roots().filter(n => rootsSelected().has(n.id)).map(n => n.label));
-    const registry = buildRegistryFromSelection(selectedItems, rootLabels, typeOverrides());
     const repoUrlStr = repoUrl().trim();
-    const repoName = repoUrlStr.split("/").filter(Boolean).pop() ?? "Opencode Workflows";
+    const folderName = path.basename(process.cwd());
+    const repoName = repoUrlStr.split("/").filter(Boolean).pop() ?? folderName;
+    
+    const registry = buildRegistryFromSelection(repoName, selectedItems, rootLabels, typeOverrides());
 
     writeRegistryFiles(process.cwd(), {
       name: repoName,
