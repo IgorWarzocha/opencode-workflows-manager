@@ -115,16 +115,29 @@ export async function scanWizardTree(rootDir: string, allowedRoots: string[]): P
     await walk(rootPath, root);
   }
 
+  const EXCLUDED_FILES = new Set([
+    "package.json",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "bun.lock",
+    "bun.lockb",
+  ]);
+
   for (const { relativePath, entry } of files) {
     const segments = relativePath.split("/");
     const basename = entry.name;
 
     if (basename === "registry.json" || basename === "registry.toml") continue;
+    if (basename.startsWith(".")) continue;
+    if (EXCLUDED_FILES.has(basename)) continue;
     const loweredBase = basename.toLowerCase();
     if (loweredBase === "readme.md" || loweredBase === "readme.txt" || loweredBase === "readme") continue;
 
     const { type, target } = resolveItemType(segments, basename);
-    const isMarkdown = entry.name.endsWith(".md");
+    const isMarkdown = entry.name.toLowerCase().endsWith(".md");
+    const isSkillAsset = segments.includes("skill");
+    if (!isMarkdown && !isSkillAsset) continue;
 
     const fullPath = path.join(rootDir, relativePath);
     let description = "";
