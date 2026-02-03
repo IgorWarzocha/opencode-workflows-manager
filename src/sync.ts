@@ -20,6 +20,26 @@ const wait = (ms: number): Promise<void> =>
     setTimeout(resolve, ms);
   });
 
+const EXCLUDED_FILES = new Set([
+  "package.json",
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+  "bun.lock",
+  "bun.lockb",
+]);
+
+const shouldSkipItem = (item: RegistryItem): boolean => {
+  const basename = path.basename(item.path);
+  if (basename.startsWith(".")) return true;
+  if (EXCLUDED_FILES.has(basename)) return true;
+  if (item.type === "doc") {
+    const lowered = basename.toLowerCase();
+    if (!lowered.endsWith(".md") && !lowered.endsWith(".mdx") && !lowered.endsWith(".markdown")) return true;
+  }
+  return false;
+};
+
 export async function performSync(
   changes: Changes,
   mode: InstallMode,
@@ -27,12 +47,13 @@ export async function performSync(
   onLog: SyncLogCallback
 ): Promise<void> {
   for (const item of changes.remove) {
+    if (shouldSkipItem(item)) continue;
     const dest = resolveTargetPath(item, mode, config);
     await fs.remove(dest);
     onLog(`Removed ${item.name}`);
   }
 
-  const downloads = [...changes.install, ...changes.refresh];
+  const downloads = [...changes.install, ...changes.refresh].filter((item) => !shouldSkipItem(item));
   let completed = 0;
 
   for (const item of downloads) {
