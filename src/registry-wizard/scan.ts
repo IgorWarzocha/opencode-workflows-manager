@@ -8,9 +8,6 @@ import type { WizardItem, WizardNode } from "./types";
 import { listFilesRecursive, listDirectories, shouldSkipDir } from "./fs-utils";
 import { buildItem, normalizeDescription, readFrontmatter } from "./item-builder";
 
-/**
- * Identifies the type and target path of a file based on its location in the directory tree.
- */
 const resolveItemType = (segments: string[], basename: string): { type: RegistryItem["type"]; target: string } => {
   const isSkillFile = basename.toLowerCase() === "skill.md";
   const opencodeIndex = segments.indexOf(".opencode");
@@ -58,9 +55,6 @@ const resolveItemType = (segments: string[], basename: string): { type: Registry
   return { type: "doc", target: basename };
 };
 
-/**
- * Scans the root directory for potential registry folders.
- */
 export const scanRootTree = async (rootDir: string): Promise<WizardNode[]> => {
   const entries = await listDirectories(rootDir);
   return entries
@@ -75,9 +69,6 @@ export const scanRootTree = async (rootDir: string): Promise<WizardNode[]> => {
     } satisfies WizardNode));
 };
 
-/**
- * Scans the workspace and builds wizard nodes for the selection interface.
- */
 export async function scanWizardTree(rootDir: string, allowedRoots: string[]): Promise<WizardNode[]> {
   const normalize = (value: string) => value.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
   const allowedList = allowedRoots.map((root) => normalize(root.trim())).filter(Boolean);
@@ -208,9 +199,6 @@ export async function scanWizardTree(rootDir: string, allowedRoots: string[]): P
   return nodes.sort((a, b) => a.label.localeCompare(b.label));
 }
 
-/**
- * Flattens the wizard tree into a list for rendering, respecting expanded state.
- */
 export function flattenWizardTree(nodes: WizardNode[], expanded: Set<string>): WizardNode[] {
   const flat: WizardNode[] = [];
   const walk = (node: WizardNode) => {
@@ -225,9 +213,6 @@ export function flattenWizardTree(nodes: WizardNode[], expanded: Set<string>): W
   return flat;
 }
 
-/**
- * Generates a Registry definition from the user's wizard selections.
- */
 export function buildRegistryFromSelection(
   name: string,
   selectedItems: WizardItem[],

@@ -293,10 +293,6 @@ export const useRegistryWizard = (rows: number, onDone: () => void) => {
           if (existing.has(repoPath)) {
             selectedIds.add(n.id);
           } else if (n.item) {
-            // Also select newly discovered items by default if they are MD files?
-            // Actually, for sync/edit, maybe we shouldn't auto-select everything new.
-            // But for "Add", we should.
-            // Let's keep existing behavior of selecting all for now if no existing registry?
             if (existing.size === 0) selectedIds.add(n.id);
           }
         });
