@@ -34,6 +34,8 @@ export const useAppLogic = () => {
 
   const [cursorFocus, setCursorFocus] = createSignal<CursorFocus | null>(null);
 
+  const [hasLocalRegistry, setHasLocalRegistry] = createSignal(false);
+
   const resetToRegistryMenu = () => {
     setIsAboutOpen(false);
     setIsAppAboutOpen(false);
@@ -65,23 +67,22 @@ export const useAppLogic = () => {
     setSelectedItems(new Set(installed));
   };
 
-  const loadInitialData = async (isLocal: boolean) => {
-    if (isLocal) {
-      const local = await loadLocalRegistry();
-      if (!local) return;
-      setAppConfig(local.config);
-      setRegistry(local.registry);
-      setInstallMode("local");
-      const allItems = getAllItems(local.registry);
-      const installed = await findInstalledItems(allItems, "local", local.config);
-      setInitialSelection(installed);
-      setSelectedItems(new Set(installed));
-      setStatus("selecting");
-      return;
-    }
-
+  const loadInitialData = async (isAdmin: boolean) => {
     const sources = await loadRegistrySources();
     setRegistrySources(sources);
+
+    if (isAdmin) {
+      const local = await loadLocalRegistry();
+      if (local) {
+        setAppConfig(local.config);
+        setRegistry(local.registry);
+        setInstallMode("local");
+        const allItems = getAllItems(local.registry);
+        const installed = await findInstalledItems(allItems, "local", local.config);
+        setInitialSelection(installed);
+        setSelectedItems(new Set(installed));
+      }
+    }
   };
 
   const visibleItems = createMemo(() => {

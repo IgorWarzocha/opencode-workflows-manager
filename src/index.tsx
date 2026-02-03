@@ -199,7 +199,7 @@ const App = () => {
             ? wizard.rootsFlat().slice(wizard.rootsScroll(), wizard.rootsScroll() + wizardRows())
             : wizard.flatNodes().slice(wizard.scroll(), wizard.scroll() + wizardRows())}
           cursor={wizard.step() === "roots" ? wizard.rootsCursor() : wizard.cursor()}
-          scrollOffset={wizard.step() === "roots" ? wizard.rootsScroll() : wizard.scroll()}
+          scrollOffset={wizard.step() === "roots" ? wizard.scroll() : wizard.scroll()}
           expanded={wizard.step() === "roots" ? wizard.rootsExpanded() : wizard.expanded()}
           selected={wizard.step() === "roots" ? wizard.rootsSelected() : wizard.selected()}
           rootsSelectionState={wizard.step() === "roots" ? wizard.rootsSelectionState() : undefined}
