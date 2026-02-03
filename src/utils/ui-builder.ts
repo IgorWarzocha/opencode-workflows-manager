@@ -57,11 +57,27 @@ export function buildVisibleItems(
 
           const prefix = pack.path.endsWith("/") ? pack.path : `${pack.path}/`;
 
+          const normalizeRelativePath = (fullPath: string): string => {
+            if (!fullPath.startsWith("http")) return fullPath;
+            try {
+              const url = new URL(fullPath);
+              const trimmed = url.pathname.replace(/^\/+/, "");
+              const packIndex = trimmed.indexOf(prefix);
+              if (packIndex !== -1) {
+                return trimmed.slice(packIndex);
+              }
+              return trimmed;
+            } catch {
+              return fullPath;
+            }
+          };
+
           for (const packItem of pack.items) {
             if (mode === "global" && packItem.type === "doc") continue;
-            const rawPath = packItem.path.startsWith(prefix)
-              ? packItem.path.slice(prefix.length)
-              : packItem.path;
+            const normalizedPath = normalizeRelativePath(packItem.path);
+            const rawPath = normalizedPath.startsWith(prefix)
+              ? normalizedPath.slice(prefix.length)
+              : normalizedPath;
             const segments = rawPath
               .split("/")
               .filter((segment) => segment.length > 0 && segment !== ".opencode");

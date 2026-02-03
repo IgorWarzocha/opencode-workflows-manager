@@ -1,10 +1,9 @@
 {
   "name": "@howaboua/opencode-workflows-manager",
-  "version": "0.0.1",
+  "version": "0.0.5",
   "bin": {
-    "opencode-workflows-manager": "src/index.tsx"
+    "opencode-workflows-manager": "build/opencode-workflows-manager"
   },
-  "module": "src/index.tsx",
   "type": "module",
   "private": false,
   "publishConfig": {
@@ -13,8 +12,15 @@
   "scripts": {
     "dev": "bun run --watch src/index.tsx",
     "build": "bun run scripts/build.ts",
-    "typecheck": "bun x tsc --noEmit && bun run build"
+    "typecheck": "bun x tsc --noEmit && bun run build",
+    "prepublishOnly": "bun run build"
   },
+  "files": [
+    "build/opencode-workflows-manager",
+    "README.md",
+    "CONTRIBUTING.md",
+    "registries.json"
+  ],
   "devDependencies": {
     "@types/bun": "latest",
     "@types/fs-extra": "^11.0.4"
@@ -25,6 +31,7 @@
   "dependencies": {
     "@babel/core": "^7.29.0",
     "@babel/preset-typescript": "^7.28.5",
+    "@howaboua/opencode-workflows-manager": "^0.0.1",
     "@iarna/toml": "^2.2.5",
     "@opentui/core": "^0.1.77",
     "@opentui/solid": "^0.1.77",
